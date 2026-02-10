@@ -18,7 +18,7 @@ online_manager:
     # - TrainerRM: Trainer with MongoDB task queue (requires mongo config)
     # - DelayTrainerR: Delayed training for parallel execution
     # - DelayTrainerRM: Delayed training with MongoDB
-    type: "TrainerR"
+    type: "TrainerRM"
 
   # Strategy definitions
   strategies:
@@ -53,66 +53,33 @@ online_manager:
 
             # Data segments (train, validation, test)
             segments:
-              train: [2020-01-01, 2022-01-01]
-              valid: [2022-01-01, 2022-07-01]
-              test: [2022-07-01, 2023-01-01]
+              train: [2020-01-01, 2024-01-01]
+              valid: [2024-01-01, 2025-01-01]
+              test: [2025-01-01, 2026-01-01]
 
-        # Recorder configuration for logging predictions and signals
-        # Supports multiple recorders for different output formats
-        recorder:
+        # Record configuration for logging predictions
+        # NOTE: Qlib uses 'record' (singular) not 'recorder'
+        record:
           # 1. SignalRecord - Save predictions as PKL (standard format)
-          - class: "SignalRecord"
-            module_path: "qlib.workflow.record_temp"
+          - class: SignalRecord
+            module_path: qlib.workflow.record_temp
             kwargs:
-              model: "<MODEL>"
-              dataset: "<DATASET>"
+              model: <MODEL>
+              dataset: <DATASET>
 
-          # 2. ParquetRecord - Save predictions as Parquet (compressed, fast I/O)
-          - class: "ParquetRecord"
-            module_path: "qlib.workflow.record_temp"
-            kwargs:
-              # Directory path for parquet files (optional, defaults to MLflow artifacts)
-              save_path: "records/parquet"
-              # Compression: snappy (default), gzip, brotli, lz4
-              compression: "snappy"
-
-          # 3. SigAnaRecord - Signal analysis (IC, ICIR, etc.)
-          - class: "SigAnaRecord"
-            module_path: "qlib.workflow.record_temp"
+          # 2. SigAnaRecord - Signal analysis (IC, ICIR, etc.)
+          - class: SigAnaRecord
+            module_path: qlib.workflow.record_temp
             kwargs:
               ann_scaler: 252
-              ana_long_short: true
-
-          # 4. PortAnaRecord - Portfolio analysis and backtesting
-          - class: "PortAnaRecord"
-            module_path: "qlib.workflow.record_temp"
-            kwargs:
-              config:
-                strategy:
-                  class: "TopkDropoutStrategy"
-                  module_path: "qlib.contrib.strategy"
-                  kwargs:
-                    signal: "<PRED>"
-                    topk: 50
-                    n_drop: 5
-                backtest:
-                  start_time: null  # Auto-detect from prediction
-                  end_time: null    # Auto-detect from prediction
-                  account: 100000000
-                  benchmark: "SH000300"
-                  exchange_kwargs:
-                    limit_threshold: 0.095
-                    deal_price: "close"
-                    open_cost: 0.0005
-                    close_cost: 0.0015
-                    min_cost: 5
+              ana_long_short: false
 
       # Rolling configuration
       rolling_config:
         # Rolling step in days (减少滚动频率以降低内存压力)
         # 原值: 10 天 (会产生大量任务)
         # 建议: 30-90 天 (trade-off: 更少任务 vs 更新频率)
-        step: 30
+        step: 90
         # Rolling type: ROLL_SD (sliding window) or ROLL_EX (expanding window)
         rtype: "ROLL_SD"
 
@@ -145,52 +112,22 @@ online_manager:
               test: [2025-01-01, 2026-01-01]
 
         # Recorder configuration for logging predictions and signals
-        # Supports multiple recorders for different output formats
-        recorder:
+        # Record configuration for logging predictions
+        # NOTE: Qlib uses 'record' (singular) not 'recorder'
+        record:
           # 1. SignalRecord - Save predictions as PKL (standard format)
-          - class: "SignalRecord"
-            module_path: "qlib.workflow.record_temp"
+          - class: SignalRecord
+            module_path: qlib.workflow.record_temp
             kwargs:
-              model: "<MODEL>"
-              dataset: "<DATASET>"
+              model: <MODEL>
+              dataset: <DATASET>
 
-          # # 2. ParquetRecord - Save predictions as Parquet (compressed, fast I/O)
-          # - class: "ParquetRecord"
-          #   module_path: "qlib.workflow.record_temp"
-          #   kwargs:
-          #     save_path: "records/parquet"
-          #     compression: "snappy"
-
-          # 3. SigAnaRecord - Signal analysis (IC, ICIR, etc.)
-          - class: "SigAnaRecord"
-            module_path: "qlib.workflow.record_temp"
+          # 2. SigAnaRecord - Signal analysis (IC, ICIR, etc.)
+          - class: SigAnaRecord
+            module_path: qlib.workflow.record_temp
             kwargs:
               ann_scaler: 252
-              ana_long_short: true
-
-          # 4. PortAnaRecord - Portfolio analysis and backtesting
-          - class: "PortAnaRecord"
-            module_path: "qlib.workflow.record_temp"
-            kwargs:
-              config:
-                strategy:
-                  class: "TopkDropoutStrategy"
-                  module_path: "qlib.contrib.strategy"
-                  kwargs:
-                    signal: "<PRED>"
-                    topk: 50
-                    n_drop: 5
-                backtest:
-                  start_time: 2025-01-01
-                  end_time: 2026-01-01
-                  account: 100000000
-                  benchmark: "SH000300"
-                  exchange_kwargs:
-                    limit_threshold: 0.095
-                    deal_price: "close"
-                    open_cost: 0.0005
-                    close_cost: 0.0015
-                    min_cost: 5
+              ana_long_short: false
 
       rolling_config:
         step: 22
@@ -241,7 +178,8 @@ qlib_config:
   # MongoDB configuration (only required for TrainerRM or DelayTrainerRM)
   mongo:
     enabled: true
-    task_url: "mongodb://admin@admin:127.0.0.1:27017/"
+    # MongoDB connection string format: mongodb://[username:password@]host[:port][/database][?options]
+    task_url: "mongodb://admin:admin@127.0.0.1:27017/qlib_online?authSource=admin"
     task_db_name: "qlib_online"
 
   # Redis configuration (optional, for caching)

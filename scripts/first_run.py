@@ -120,7 +120,19 @@ Examples:
     provider_uri = qlib_config.get('provider_uri', '~/.qlib/qlib_data/cn_data')
     region = qlib_config.get('region', 'cn')
 
-    qlib.init(provider_uri=provider_uri, region=region)
+    # Load MongoDB configuration if enabled
+    mongo_config = qlib_config.get('mongo', {})
+    if mongo_config.get('enabled', False):
+        mongo_conf = {
+            "task_url": mongo_config.get('task_url', 'mongodb://localhost:27017/'),
+            "task_db_name": mongo_config.get('task_db_name', 'qlib_online'),
+        }
+        print(f"MongoDB enabled: {mongo_conf['task_url']}")
+        qlib.init(provider_uri=provider_uri, region=region, mongo=mongo_conf)
+    else:
+        print("MongoDB disabled (using MLflow only)")
+        qlib.init(provider_uri=provider_uri, region=region)
+
     print("Qlib initialized successfully")
 
     # Create manager (strategies are initialized but not trained yet)
