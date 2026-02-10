@@ -34,9 +34,15 @@ online_manager:
               class: "Alpha158"
               module_path: "qlib.contrib.data.handler"
             segments:
-              train: ("2020-01-01", "2022-01-01")
-              valid: ("2022-01-01", "2022-07-01")
-              test: ("2022-07-01", "2023-01-01")
+              train:
+                - "2020-01-01"
+                - "2022-01-01"
+              valid:
+                - "2022-01-01"
+                - "2022-07-01"
+              test:
+                - "2022-07-01"
+                - "2023-01-01"
 
       rolling_config:
         step: 550

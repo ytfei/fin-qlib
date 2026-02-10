@@ -108,7 +108,8 @@ Examples:
             reset_manager(manager_path)
         else:
             print("Reset cancelled")
-            sys.exit(0)
+
+        sys.exit(0)
 
     # Initialize Qlib
     print("=" * 80)
@@ -132,6 +133,7 @@ Examples:
             config_path=str(config_path),
             log_dir=args.log_dir
         )
+        manager.run_first_training()
 
         print("\n" + "=" * 80)
         print("First Training Completed Successfully!")

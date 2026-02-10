@@ -53,9 +53,15 @@ online_manager:
 
             # Data segments (train, validation, test)
             segments:
-              train: ("2020-01-01", "2022-01-01")
-              valid: ("2022-01-01", "2022-07-01")
-              test: ("2022-07-01", "2023-01-01")
+              train:
+                - "2020-01-01"
+                - "2022-01-01"
+              valid:
+                - "2022-01-01"
+                - "2022-07-01"
+              test:
+                - "2022-07-01"
+                - "2023-01-01"
 
       # Rolling configuration
       rolling_config:
@@ -88,9 +94,15 @@ online_manager:
               class: "Alpha158"
               module_path: "qlib.contrib.data.handler"
             segments:
-              train: ("2020-01-01", "2022-01-01")
-              valid: ("2022-01-01", "2022-07-01")
-              test: ("2022-07-01", "2023-01-01")
+              train:
+                - "2020-01-01"
+                - "2022-01-01"
+              valid:
+                - "2022-01-01"
+                - "2022-07-01"
+              test:
+                - "2022-07-01"
+                - "2023-01-01"
 
       rolling_config:
         step: 550
@@ -123,9 +135,15 @@ online_manager:
               kwargs:
                 fit_end_dt: "2023-01-01"
             segments:
-              train: ("2020-01-01", "2022-01-01")
-              valid: ("2022-01-01", "2022-07-01")
-              test: ("2022-07-01", "2023-01-01")
+              train:
+                - "2020-01-01"
+                - "2022-01-01"
+              valid:
+                - "2022-01-01"
+                - "2022-07-01"
+              test:
+                - "2022-07-01"
+                - "2023-01-01"
 
       rolling_config:
         step: 550
