@@ -16,10 +16,12 @@ with support for:
 import os
 import pickle
 import yaml
+import json
 import logging
 from pathlib import Path
 from typing import Dict, List, Optional, Union, Callable
 from datetime import datetime
+from pprint import pformat
 
 import pandas as pd
 import qlib
@@ -177,16 +179,12 @@ class ManagedOnlineManager:
             freq=manager_config.get('freq', 'day')
         )
 
-        # Run first training
-        self.logger.info("Running first training...")
-        manager.first_train()
-        self.logger.info("First training completed")
+        # Log pending tasks (before training)
+        self._log_pending_tasks(enabled_strategies, trainer, manager_config)
 
-        # Initial save
-        manager_path = manager_config.get('manager_path', 'checkpoints/online_manager.pkl')
-        Path(manager_path).parent.mkdir(parents=True, exist_ok=True)
-        manager.to_pickle(manager_path)
-        self.logger.info(f"Manager saved to {manager_path}")
+        # NOTE: first_train() is NOT called here.
+        # It should be explicitly called by the user via run_first_training() method.
+        # This allows for better control and separation of concerns.
 
         return manager
 
@@ -278,6 +276,180 @@ class ManagedOnlineManager:
 
         TrainerClass = trainer_map.get(trainer_type, TrainerR)
         return TrainerClass()
+
+    def _log_pending_tasks(self, strategies: List[OnlineStrategy], trainer, manager_config: Dict):
+        """
+        Log pending tasks and their configurations before training.
+
+        This method records:
+        - Task configurations for each strategy
+        - Model and dataset parameters
+        - Recorder configurations
+        - Rolling configurations
+        - Saves to both log file and JSON file for reference
+
+        Args:
+            strategies: List of OnlineStrategy instances
+            trainer: Trainer instance
+            manager_config: Manager configuration dict
+        """
+        self.logger.info("=" * 80)
+        self.logger.info("PENDING TASKS CONFIGURATION")
+        self.logger.info("=" * 80)
+
+        # Collect task information
+        tasks_info = {
+            "timestamp": datetime.now().isoformat(),
+            "trainer_type": type(trainer).__name__,
+            "trainer_config": manager_config.get('trainer', {}),
+            "manager_config": {
+                "begin_time": manager_config.get('begin_time'),
+                "freq": manager_config.get('freq', 'day'),
+                "manager_path": manager_config.get('manager_path', 'checkpoints/online_manager.pkl'),
+            },
+            "strategies": []
+        }
+
+        for strategy in strategies:
+            strat_name = strategy.name_id
+            self.logger.info(f"\n{'=' * 60}")
+            self.logger.info(f"Strategy: {strat_name}")
+            self.logger.info(f"{'=' * 60}")
+
+            # Get task template
+            task_template = strategy.task_template
+
+            strat_info = {
+                "name": strat_name,
+                "type": type(strategy).__name__,
+                "task_template": {}
+            }
+
+            # Model configuration
+            if 'model' in task_template:
+                model_config = task_template['model']
+                self.logger.info(f"\n[Model]")
+                self.logger.info(f"  Class: {model_config.get('class')}")
+                self.logger.info(f"  Module: {model_config.get('module_path')}")
+                self.logger.info(f"  Parameters:")
+                for key, value in model_config.get('kwargs', {}).items():
+                    self.logger.info(f"    {key}: {value}")
+
+                strat_info["task_template"]["model"] = model_config
+
+            # Dataset configuration
+            if 'dataset' in task_template:
+                dataset_config = task_template['dataset']
+                self.logger.info(f"\n[Dataset]")
+                self.logger.info(f"  Class: {dataset_config.get('class')}")
+                self.logger.info(f"  Module: {dataset_config.get('module_path')}")
+
+                # Log segments
+                if 'kwargs' in dataset_config and 'segments' in dataset_config['kwargs']:
+                    segments = dataset_config['kwargs']['segments']
+                    self.logger.info(f"  Segments:")
+                    for seg_type, seg_range in segments.items():
+                        self.logger.info(f"    {seg_type}: {seg_range}")
+
+                # Log handler
+                if 'kwargs' in dataset_config and 'handler' in dataset_config['kwargs']:
+                    handler = dataset_config['kwargs']['handler']
+                    self.logger.info(f"  Handler:")
+                    self.logger.info(f"    Class: {handler.get('class')}")
+                    self.logger.info(f"    Module: {handler.get('module_path')}")
+
+                strat_info["task_template"]["dataset"] = dataset_config
+
+            # Recorder configuration
+            if 'recorder' in task_template:
+                recorder_config = task_template['recorder']
+                self.logger.info(f"\n[Recorder]")
+                if isinstance(recorder_config, list):
+                    self.logger.info(f"  Count: {len(recorder_config)}")
+                    for i, rec in enumerate(recorder_config):
+                        self.logger.info(f"  [{i}] Class: {rec.get('class')}")
+                        self.logger.info(f"      Module: {rec.get('module_path')}")
+                else:
+                    self.logger.info(f"  Class: {recorder_config.get('class')}")
+                    self.logger.info(f"  Module: {recorder_config.get('module_path')}")
+
+                strat_info["task_template"]["recorder"] = recorder_config
+
+            # Rolling configuration
+            if hasattr(strategy, 'rolling_gen'):
+                rolling_gen = strategy.rolling_gen
+                self.logger.info(f"\n[Rolling]")
+                self.logger.info(f"  Step: {rolling_gen.step}")
+                self.logger.info(f"  Type: {rolling_gen.rtype}")
+
+                strat_info["rolling"] = {
+                    "step": rolling_gen.step,
+                    "rtype": rolling_gen.rtype
+                }
+
+            tasks_info["strategies"].append(strat_info)
+
+        # Summary
+        self.logger.info(f"\n{'=' * 80}")
+        self.logger.info(f"SUMMARY")
+        self.logger.info(f"{'=' * 80}")
+        self.logger.info(f"Total Strategies: {len(strategies)}")
+        self.logger.info(f"Trainer: {type(trainer).__name__}")
+        self.logger.info(f"Frequency: {manager_config.get('freq', 'day')}")
+        self.logger.info(f"Begin Time: {manager_config.get('begin_time', 'latest')}")
+        self.logger.info(f"{'=' * 80}\n")
+
+        # Save to JSON file for reference
+        tasks_dir = self.log_dir / "tasks"
+        tasks_dir.mkdir(parents=True, exist_ok=True)
+        tasks_file = tasks_dir / f"pending_tasks_{datetime.now():%Y%m%d_%H%M%S}.json"
+
+        with open(tasks_file, 'w', encoding='utf-8') as f:
+            json.dump(tasks_info, f, indent=2, ensure_ascii=False, default=str)
+
+        self.logger.info(f"Task configuration saved to: {tasks_file}")
+        self.logger.info("=" * 80 + "\n")
+
+    def run_first_training(self, save_checkpoint: bool = True):
+        """
+        Execute the first training run for all strategies.
+
+        This method should be called after creating a new ManagedOnlineManager
+        to train the initial models for all enabled strategies.
+
+        Parameters
+        ----------
+        save_checkpoint : bool, default True
+            Whether to save the manager checkpoint after training completes.
+
+        Example
+        -------
+        >>> manager = ManagedOnlineManager("config/online_config.yaml")
+        >>> manager.run_first_training()
+        """
+        self.logger.info("=" * 80)
+        self.logger.info("STARTING FIRST TRAINING")
+        self.logger.info("=" * 80)
+
+        try:
+            # Run first training on the underlying OnlineManager
+            self.logger.info("Executing first_train() on OnlineManager...")
+            self.manager.first_train()
+
+            self.logger.info("First training completed successfully")
+
+            # Save checkpoint after training
+            if save_checkpoint:
+                self._save_checkpoint()
+                self.logger.info("Manager checkpoint saved after first training")
+
+            self.logger.info("=" * 80)
+            self.logger.info("FIRST TRAINING COMPLETED")
+            self.logger.info("=" * 80)
+
+        except Exception as e:
+            self.logger.error(f"First training failed: {e}", exc_info=True)
+            raise
 
     def sync_strategies(self):
         """
@@ -452,6 +624,41 @@ class ManagedOnlineManager:
         for strategy in self.manager.strategies:
             models[strategy.name_id] = strategy.tool.online_models()
         return models
+
+    def print_online_models(self):
+        """Print detailed information about all online models."""
+        print("\n" + "=" * 80)
+        print("ONLINE MODELS STATUS")
+        print("=" * 80)
+
+        total_models = 0
+        for strategy in self.manager.strategies:
+            online_models = strategy.tool.online_models()
+            model_count = len(online_models)
+            total_models += model_count
+
+            print(f"\nStrategy: {strategy.name_id}")
+            print(f"  Online Models: {model_count}")
+
+            if model_count > 0:
+                for i, model_rec in enumerate(online_models):
+                    rec_id = model_rec.info['id']
+                    try:
+                        task = model_rec.load_object("task")
+                        model_class = task["model"]["class"]
+                        test_segment = task["dataset"]["kwargs"]["segments"]["test"]
+                        print(f"    [{i}] {model_class}")
+                        print(f"        Recorder ID: {rec_id[:8]}...")
+                        print(f"        Test Segment: {test_segment}")
+                    except Exception as e:
+                        print(f"    [{i}] Error loading info: {e}")
+
+        print(f"\n{'=' * 80}")
+        print(f"Total Online Models: {total_models}")
+        print(f"Total Strategies: {len(self.manager.strategies)}")
+        print("=" * 80 + "\n")
+
+        return total_models
 
     def evaluate_strategies(self, start_date: str, end_date: str) -> Dict:
         """

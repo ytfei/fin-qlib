@@ -41,7 +41,7 @@ online_manager:
             lambda_l2: 0.0
             max_depth: 8
             num_leaves: 210
-            num_threads: 20
+            num_threads: 4  # 减少线程数以降低内存占用 (原值: 20)
 
         dataset:
           class: "DatasetH"
@@ -109,8 +109,10 @@ online_manager:
 
       # Rolling configuration
       rolling_config:
-        # Rolling step in days (550 days ≈ 2 years of trading days)
-        step: 10
+        # Rolling step in days (减少滚动频率以降低内存压力)
+        # 原值: 10 天 (会产生大量任务)
+        # 建议: 30-90 天 (trade-off: 更少任务 vs 更新频率)
+        step: 30
         # Rolling type: ROLL_SD (sliding window) or ROLL_EX (expanding window)
         rtype: "ROLL_SD"
 
@@ -138,9 +140,9 @@ online_manager:
               class: "Alpha158"
               module_path: "qlib.contrib.data.handler"
             segments:
-              train: [2020-01-01, 2022-01-01]
-              valid: [2022-01-01, 2022-07-01]
-              test: [2022-07-01, 2023-01-01]
+              train: [2020-01-01, 2024-01-01]
+              valid: [2024-01-01, 2025-01-01]
+              test: [2025-01-01, 2026-01-01]
 
         # Recorder configuration for logging predictions and signals
         # Supports multiple recorders for different output formats
@@ -152,12 +154,12 @@ online_manager:
               model: "<MODEL>"
               dataset: "<DATASET>"
 
-          # 2. ParquetRecord - Save predictions as Parquet (compressed, fast I/O)
-          - class: "ParquetRecord"
-            module_path: "qlib.workflow.record_temp"
-            kwargs:
-              save_path: "records/parquet"
-              compression: "snappy"
+          # # 2. ParquetRecord - Save predictions as Parquet (compressed, fast I/O)
+          # - class: "ParquetRecord"
+          #   module_path: "qlib.workflow.record_temp"
+          #   kwargs:
+          #     save_path: "records/parquet"
+          #     compression: "snappy"
 
           # 3. SigAnaRecord - Signal analysis (IC, ICIR, etc.)
           - class: "SigAnaRecord"
@@ -179,8 +181,8 @@ online_manager:
                     topk: 50
                     n_drop: 5
                 backtest:
-                  start_time: null
-                  end_time: null
+                  start_time: 2025-01-01
+                  end_time: 2026-01-01
                   account: 100000000
                   benchmark: "SH000300"
                   exchange_kwargs:

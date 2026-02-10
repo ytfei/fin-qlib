@@ -123,9 +123,10 @@ Examples:
     qlib.init(provider_uri=provider_uri, region=region)
     print("Qlib initialized successfully")
 
-    # Create manager and run first training
+    # Create manager (strategies are initialized but not trained yet)
     print("\n" + "=" * 80)
-    print("Creating Manager and Running First Training")
+    print("Creating Manager")
+    print("Strategies initialized. First training will be executed separately...")
     print("=" * 80)
 
     try:
@@ -133,6 +134,16 @@ Examples:
             config_path=str(config_path),
             log_dir=args.log_dir
         )
+
+        print("\n" + "=" * 80)
+        print("Manager Created Successfully!")
+        print("=" * 80)
+
+        # Run first training
+        print("\n" + "=" * 80)
+        print("Running First Training")
+        print("=" * 80)
+
         manager.run_first_training()
 
         print("\n" + "=" * 80)
