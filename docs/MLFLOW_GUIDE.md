@@ -162,7 +162,7 @@ crontab -e
 ### 示例 1: 手动使用 MLflow Logger
 
 ```python
-from src.mlflow_integration import (
+from fqlib.mlflow_integration import (
     MLflowLogger,
     QlibMetricsLogger,
     QlibBacktestAnalyzer,
@@ -205,7 +205,7 @@ mlflow_logger.end_run()
 ### 示例 2: 包装现有策略
 
 ```python
-from src.mlflow_integration import MLflowEnabledStrategy
+from fqlib.mlflow_integration import MLflowEnabledStrategy
 from qlib.workflow.online.strategy import RollingStrategy
 
 # 原始策略
@@ -227,7 +227,7 @@ mlflow_strategy.run_backtest_and_log("2023-01-01", "2024-01-01")
 ### 示例 3: 批量实验对比
 
 ```python
-from src.mlflow_integration import MLflowLogger
+from fqlib.mlflow_integration import MLflowLogger
 
 # 对比不同参数
 for learning_rate in [0.01, 0.05, 0.1]:

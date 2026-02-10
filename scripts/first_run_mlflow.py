@@ -23,7 +23,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import yaml
 import qlib
-from src.managed_manager import ManagedOnlineManager
+from fqlib.managed_manager import ManagedOnlineManager
 
 
 def reset_manager(manager_path: Path):
@@ -143,7 +143,7 @@ def main():
 
         # Setup MLflow integration for the manager
         if mlflow_config.get('enabled', False):
-            from src.mlflow_integration import MLflowLogger, MLflowEnabledStrategy
+            from fqlib.mlflow_integration import MLflowLogger, MLflowEnabledStrategy
 
             mlflow_logger = MLflowLogger(
                 experiment_name=mlflow_config.get('experiment_name', 'qlib_online'),

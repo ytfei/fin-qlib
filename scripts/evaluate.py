@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import yaml
 import qlib
-from src.managed_manager import ManagedOnlineManager
+from fqlib.managed_manager import ManagedOnlineManager
 
 
 def main():

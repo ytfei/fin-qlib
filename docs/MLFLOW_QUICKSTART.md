@@ -135,7 +135,7 @@ crontab -e
 ### 1. 参数对比实验
 
 ```python
-from src.mlflow_integration import MLflowLogger
+from fqlib.mlflow_integration import MLflowLogger
 
 for lr in [0.01, 0.05, 0.1]:
     for depth in [6, 8, 10]:

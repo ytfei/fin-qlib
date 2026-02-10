@@ -20,7 +20,7 @@ from pathlib import Path
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.managed_manager import ManagedOnlineManager
+from fqlib.managed_manager import ManagedOnlineManager
 import qlib
 import yaml
 
@@ -75,7 +75,7 @@ def setup_mlflow_integration(manager, mlflow_config: dict):
         print("MLflow integration disabled")
         return
 
-    from src.mlflow_integration import (
+    from fqlib.mlflow_integration import (
         MLflowLogger,
         MLflowEnabledStrategy,
         QlibBacktestAnalyzer
