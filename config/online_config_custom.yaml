@@ -1,0 +1,243 @@
+# Qlib Online Manager Configuration
+# 展示如何添加自定义策略和新因子
+
+online_manager:
+  manager_path: "checkpoints/online_manager.pkl"
+  begin_time: null
+  freq: "day"
+
+  trainer:
+    type: "TrainerR"
+
+  strategies:
+    # ========================================
+    # 示例1: 使用自定义策略
+    # ========================================
+    - name: "FixedWindow_LGB"
+      enabled: false  # 设置为 true 以启用
+      type: "Custom"  # 自定义策略使用 "Custom" 类型
+
+      # 指定自定义策略类
+      class: "FixedWindowStrategy"
+      module_path: "examples.custom_strategy_example"
+
+      # 策略初始化参数
+      init_params:
+        retrain_interval: 90  # 每90天重新训练一次
+
+      # 任务模板（固定窗口，不滚动）
+      task_template:
+        model:
+          class: "LGBModel"
+          module_path: "qlib.contrib.model.gbdt"
+          kwargs:
+            loss: "mse"
+            colsample_bytree: 0.8879
+            learning_rate: 0.0421
+            subsample: 0.8789
+            max_depth: 8
+            num_leaves: 210
+
+        dataset:
+          class: "DatasetH"
+          module_path: "qlib.data.dataset"
+          kwargs:
+            handler:
+              class: "Alpha158"
+              module_path: "qlib.contrib.data.handler"
+            segments:
+              # 固定3年训练窗口（不像 RollingStrategy 那样滚动）
+              train: ("2020-01-01", "2023-01-01")
+              valid: ("2023-01-01", "2023-07-01")
+              test: ("2023-07-01", "2024-01-01")
+
+    # ========================================
+    # 示例2: 使用自定义因子（Handler）
+    # ========================================
+    - name: "MultiStyle_LGB"
+      enabled: false
+      type: "RollingStrategy"  # 仍然使用 RollingStrategy
+
+      task_template:
+        model:
+          class: "LGBModel"
+          module_path: "qlib.contrib.model.gbdt"
+          kwargs:
+            loss: "mse"
+            learning_rate: 0.0421
+            max_depth: 8
+
+        dataset:
+          class: "DatasetH"
+          module_path: "qlib.data.dataset"
+          kwargs:
+            # ===== 关键：使用自定义 Handler =====
+            handler:
+              class: "MultiStyleFactorHandler"
+              module_path: "examples.custom_handler_example"
+
+              # Handler 初始化参数
+              init_params:
+                styles:
+                  - momentum     # 动量因子
+                  - volatility   # 波动率因子
+                  - reversal     # 反转因子
+
+            segments:
+              train: ("2020-01-01", "2022-01-01")
+              valid: ("2022-01-01", "2022-07-01")
+              test: ("2022-07-01", "2023-01-01")
+
+      rolling_config:
+        step: 550
+        rtype: "ROLL_SD"
+
+    # ========================================
+    # 示例3: 集成策略（同时保留多个模型）
+    # ========================================
+    - name: "Ensemble_LGB_XGB"
+      enabled: false
+      type: "Custom"
+      class: "EnsembleStrategy"
+      module_path: "examples.custom_strategy_example"
+
+      init_params:
+        keep_n_models: 3  # 保留最近的3个模型
+
+      # EnsembleStrategy 支持多个任务模板
+      task_templates:
+        # 模板1: LGB + Alpha158
+        - model:
+            class: "LGBModel"
+            module_path: "qlib.contrib.model.gbdt"
+          dataset:
+            class: "DatasetH"
+            module_path: "qlib.data.dataset"
+            kwargs:
+              handler:
+                class: "Alpha158"
+                module_path: "qlib.contrib.data.handler"
+              segments:
+                train: ("2020-01-01", "2022-01-01")
+                valid: ("2022-01-01", "2022-07-01")
+                test: ("2022-07-01", "2023-01-01")
+
+        # 模板2: XGB + Alpha158
+        - model:
+            class: "XGBoostModel"
+            module_path: "qlib.contrib.model.xgboost"
+          dataset:
+            class: "DatasetH"
+            module_path: "qlib.data.dataset"
+            kwargs:
+              handler:
+                class: "Alpha158"
+                module_path: "qlib.contrib.data.handler"
+              segments:
+                train: ("2020-01-01", "2022-01-01")
+                valid: ("2022-01-01", "2022-07-01")
+                test: ("2022-07-01", "2023-01-01")
+
+    # ========================================
+    # 示例4: 自适应重训练策略
+    # ========================================
+    - name: "Adaptive_LGB"
+      enabled: false
+      type: "Custom"
+      class: "AdaptiveRetrainStrategy"
+      module_path: "examples.custom_strategy_example"
+
+      init_params:
+        retrain_interval: 30          # 正常情况下每30天重训练
+        performance_threshold: 0.02   # IC下降0.02时立即重训练
+        metric: "ic"                  # 监控的指标
+
+      task_template:
+        model:
+          class: "LGBModel"
+          module_path: "qlib.contrib.model.gbdt"
+        dataset:
+          class: "DatasetH"
+          module_path: "qlib.data.dataset"
+          kwargs:
+            handler:
+              class: "Alpha158"
+              module_path: "qlib.contrib.data.handler"
+            segments:
+              train: ("2020-01-01", "2022-01-01")
+              valid: ("2022-01-01", "2022-07-01")
+              test: ("2022-07-01", "2023-01-01")
+
+    # ========================================
+    # 示例5: 完全自定义策略 + 自定义因子
+    # ========================================
+    - name: "MyCustom_Strategy"
+      enabled: false
+      type: "Custom"
+      class: "MyCustomStrategy"  # 你自己实现的策略类
+      module_path: "my_strategies"  # 你的模块路径
+
+      init_params:
+        param1: value1
+        param2: value2
+
+      task_template:
+        model:
+          class: "MyCustomModel"  # 你自己的模型类
+          module_path: "my_models"
+          kwargs:
+            hidden_size: [256, 128, 64]
+            dropout: 0.2
+
+        dataset:
+          class: "DatasetH"
+          module_path: "qlib.data.dataset"
+          kwargs:
+            # 使用自定义的因子处理器
+            handler:
+              class: "MyCustomHandler"
+              module_path: "my_handlers"
+              init_params:
+                factor_list:
+                  - momentum_5d
+                  - momentum_20d
+                  - volatility_10d
+                  - custom_factor_1
+                  - custom_factor_2
+            segments:
+              train: ("2020-01-01", "2022-01-01")
+              valid: ("2022-01-01", "2022-07-01")
+              test: ("2022-07-01", "2023-01-01")
+
+  # ========================================
+  # 信号配置
+  # ========================================
+  signal_config:
+    ensemble_method: "average"
+
+    # 多个策略时，可以使用加权平均
+    # ensemble_method: "weighted"
+    # weights:
+    #   FixedWindow_LGB: 0.4
+    #   MultiStyle_LGB: 0.3
+    #   Adaptive_LGB: 0.3
+
+  signal_export:
+    enabled: true
+    dir: "signals"
+    format: "csv"
+    export_latest: true
+
+# ========================================
+# Qlib 初始化配置
+# ========================================
+qlib_config:
+  provider_uri: "~/.qlib/qlib_data/cn_data"
+  region: "cn"
+  mlflow_tracking_uri: null
+
+  # MongoDB（可选）
+  mongo:
+    enabled: false
+    task_url: "mongodb://localhost:27017/"
+    task_db_name: "qlib_online"

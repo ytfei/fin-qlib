@@ -1,0 +1,57 @@
+# Simple configuration for testing/development
+
+online_manager:
+  manager_path: "checkpoints/online_manager.pkl"
+  begin_time: null
+  freq: "day"
+
+  trainer:
+    type: "TrainerR"
+
+  strategies:
+    # Single strategy for quick testing
+    - name: "LGB_Test"
+      enabled: true
+      type: "RollingStrategy"
+
+      task_template:
+        model:
+          class: "LGBModel"
+          module_path: "qlib.contrib.model.gbdt"
+          kwargs:
+            loss: "mse"
+            colsample_bytree: 0.8879
+            learning_rate: 0.0421
+            subsample: 0.8789
+            max_depth: 8
+            num_leaves: 210
+
+        dataset:
+          class: "DatasetH"
+          module_path: "qlib.data.dataset"
+          kwargs:
+            handler:
+              class: "Alpha158"
+              module_path: "qlib.contrib.data.handler"
+            segments:
+              train: ("2020-01-01", "2022-01-01")
+              valid: ("2022-01-01", "2022-07-01")
+              test: ("2022-07-01", "2023-01-01")
+
+      rolling_config:
+        step: 550
+        rtype: "ROLL_SD"
+
+  signal_config:
+    ensemble_method: "average"
+
+  signal_export:
+    enabled: true
+    dir: "signals"
+    format: "csv"
+    export_latest: true
+
+qlib_config:
+  provider_uri: "~/.qlib/qlib_data/cn_data"
+  region: "cn"
+  mlflow_tracking_uri: null

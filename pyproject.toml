@@ -1,0 +1,12 @@
+[project]
+name = "fin-qlib"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "pyqlib",
+]
+
+[tool.uv.sources]
+pyqlib = { path = "../qlib/dist/pyqlib-2026.2.8.dev2-cp313-cp313-macosx_15_0_arm64.whl" }

@@ -1,0 +1,23 @@
+# Qlib and dependencies
+pyqlib>=0.9.0
+pandas>=1.3.0
+numpy>=1.21.0
+pyyaml>=5.4.0
+
+# MLflow integration
+mlflow>=2.0.0
+matplotlib>=3.5.0
+seaborn>=0.12.0
+scipy>=1.7.0
+
+# Optional dependencies
+# For MongoDB integration
+# pymongo>=3.12.0
+
+# For Parquet export
+# pyarrow>=5.0.0
+
+# For development
+# pytest>=6.0.0
+# black>=21.0.0
+# flake8>=3.9.0

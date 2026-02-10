@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  fin-qlib:
+    build: .
+    container_name: fin-qlib
+    volumes:
+      - ./config:/app/config
+      - ./checkpoints:/app/checkpoints
+      - ./signals:/app/signals
+      - ./logs:/app/logs
+      # Mount qlib data
+      - ~/.qlib/qlib_data:/root/.qlib/qlib_data
+    environment:
+      - TZ=Asia/Shanghai
+    # For cron-like behavior, use a separate scheduler
+    # or use host's cron to run: docker exec fin-qlib python scripts/run_routine.py
+    restart: unless-stopped
+
+  # Optional: MLflow server
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.0.1
+    container_name: mlflow-server
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./mlruns:/mlflow/mlruns
+    command: mlflow server --backend-store-uri sqlite:///mlflow.db --default-artifact-root /mlflow/mlruns
+    restart: unless-stopped
+
+  # Optional: MongoDB
+  mongo:
+    image: mongo:6.0
+    container_name: mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    restart: unless-stopped
+
+volumes:
+  mongodb_data:

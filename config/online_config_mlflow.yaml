@@ -1,0 +1,175 @@
+# Qlib Online Manager Configuration with MLflow Integration
+# 展示如何配置 MLflow 集成，自动记录训练和回测指标
+
+online_manager:
+  manager_path: "checkpoints/online_manager.pkl"
+  begin_time: null
+  freq: "day"
+
+  trainer:
+    type: "TrainerR"
+
+  # ========================================
+  # MLflow 集成配置
+  # ========================================
+  mlflow_integration:
+    enabled: true  # 是否启用 MLflow 集成
+
+    experiment_name: "qlib_online_production"  # MLflow 实验名称
+
+    # MLflow 服务器地址
+    # - null: 使用本地文件系统 (./mlruns)
+    # - "http://localhost:5000": 使用本地 MLflow 服务器
+    # - "http://mlflow.example.com": 使用远程 MLflow 服务器
+    tracking_uri: null  # 或 "http://localhost:5000"
+
+    # 自动回测配置
+    auto_backtest:
+      enabled: true  # 是否在每次 routine 后自动运行回测
+
+      # 回测参数
+      top_n: 50  # 选择 Top N 股票
+      lookback_days: 30  # 回测窗口（天）
+
+      # 基准配置
+      benchmark:
+        enabled: true  # 是否使用基准
+        instrument: "SH000300"  # 基准指数（沪深300）
+        # 或使用 "CSI300", "CSI500", "SH000001" (上证指数)
+
+    # 指标记录配置
+    log_training_metrics: true  # 记录训练指标（loss, time, etc.）
+    log_feature_importance: true  # 记录特征重要性
+    log_predictions: true  # 记录预测指标（IC, Rank IC）
+    log_plots: true  # 记录可视化图表
+
+  strategies:
+    # 示例1: 标准 LGB + Alpha158，启用 MLflow
+    - name: "LGB_Alpha158_MLflow"
+      enabled: true
+      type: "RollingStrategy"
+
+      task_template:
+        model:
+          class: "LGBModel"
+          module_path: "qlib.contrib.model.gbdt"
+          kwargs:
+            loss: "mse"
+            colsample_bytree: 0.8879
+            learning_rate: 0.0421
+            subsample: 0.8789
+            max_depth: 8
+            num_leaves: 210
+            num_threads: 20
+
+        dataset:
+          class: "DatasetH"
+          module_path: "qlib.data.dataset"
+          kwargs:
+            handler:
+              class: "Alpha158"
+              module_path: "qlib.contrib.data.handler"
+            segments:
+              train: ("2020-01-01", "2022-01-01")
+              valid: ("2022-01-01", "2022-07-01")
+              test: ("2022-07-01", "2023-01-01")
+
+      rolling_config:
+        step: 550
+        rtype: "ROLL_SD"
+
+    # 示例2: 使用自定义因子的策略
+    - name: "CustomFactor_LGB"
+      enabled: false
+      type: "RollingStrategy"
+
+      task_template:
+        model:
+          class: "LGBModel"
+          module_path: "qlib.contrib.model.gbdt"
+
+        dataset:
+          class: "DatasetH"
+          module_path: "qlib.data.dataset"
+          kwargs:
+            # 使用自定义因子
+            handler:
+              class: "MultiStyleFactorHandler"
+              module_path: "examples.custom_handler_example"
+              init_params:
+                styles:
+                  - momentum
+                  - volatility
+                  - reversal
+            segments:
+              train: ("2020-01-01", "2022-01-01")
+              valid: ("2022-01-01", "2022-07-01")
+              test: ("2022-07-01", "2023-01-01")
+
+      rolling_config:
+        step: 550
+        rtype: "ROLL_SD"
+
+    # 示例3: XGB 模型
+    - name: "XGB_Alpha158"
+      enabled: false
+      type: "RollingStrategy"
+
+      task_template:
+        model:
+          class: "XGBoostModel"
+          module_path: "qlib.contrib.model.xgboost"
+          kwargs:
+            loss: "mse"
+            colsample_bytree: 0.8879
+            learning_rate: 0.0421
+            max_depth: 8
+            n_estimators: 200
+
+        dataset:
+          class: "DatasetH"
+          module_path: "qlib.data.dataset"
+          kwargs:
+            handler:
+              class: "Alpha158"
+              module_path: "qlib.contrib.data.handler"
+            segments:
+              train: ("2020-01-01", "2022-01-01")
+              valid: ("2022-01-01", "2022-07-01")
+              test: ("2022-07-01", "2023-01-01")
+
+      rolling_config:
+        step: 550
+        rtype: "ROLL_SD"
+
+  # 信号配置
+  signal_config:
+    ensemble_method: "average"  # average, weighted, dynamic, voting
+
+    # 如果使用加权平均
+    # ensemble_method: "weighted"
+    # weights:
+    #   LGB_Alpha158_MLflow: 0.6
+    #   CustomFactor_LGB: 0.4
+
+  # 信号导出配置
+  signal_export:
+    enabled: true
+    dir: "signals"
+    format: "csv"
+    export_latest: true
+
+# Qlib 初始化配置
+qlib_config:
+  provider_uri: "~/.qlib/qlib_data/cn_data"
+  region: "cn"
+
+  # MLflow 配置（与上面保持一致）
+  # 如果配置了 tracking_uri，qlib 也会使用
+  mlflow_tracking_uri: null  # 或 "http://localhost:5000"
+
+  # MongoDB（可选，用于 TrainerRM）
+  mongo:
+    enabled: false
+    task_url: "mongodb://localhost:27017/"
+    task_db_name: "qlib_online"

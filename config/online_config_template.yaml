@@ -1,0 +1,196 @@
+# Qlib Online Manager Configuration Template
+# Copy this file to online_config.yaml and customize for your needs
+
+online_manager:
+  # Path to save/load manager checkpoint
+  manager_path: "checkpoints/online_manager.pkl"
+
+  # Initial begin time (None for latest)
+  begin_time: null
+
+  # Data frequency (day, minute, etc.)
+  freq: "day"
+
+  # Trainer configuration
+  trainer:
+    # Options: TrainerR, TrainerRM, DelayTrainerR, DelayTrainerRM
+    # - TrainerR: Simple trainer with MLflow recorder
+    # - TrainerRM: Trainer with MongoDB task queue (requires mongo config)
+    # - DelayTrainerR: Delayed training for parallel execution
+    # - DelayTrainerRM: Delayed training with MongoDB
+    type: "TrainerR"
+
+  # Strategy definitions
+  strategies:
+    # Example: LightGBM with Alpha158 features
+    - name: "LGB_Alpha158"
+      enabled: true
+      type: "RollingStrategy"
+
+      # Task template (model + dataset configuration)
+      task_template:
+        model:
+          class: "LGBModel"
+          module_path: "qlib.contrib.model.gbdt"
+          kwargs:
+            loss: "mse"
+            colsample_bytree: 0.8879
+            learning_rate: 0.0421
+            subsample: 0.8789
+            lambda_l1: 0.0
+            lambda_l2: 0.0
+            max_depth: 8
+            num_leaves: 210
+            num_threads: 20
+
+        dataset:
+          class: "DatasetH"
+          module_path: "qlib.data.dataset"
+          kwargs:
+            handler:
+              class: "Alpha158"
+              module_path: "qlib.contrib.data.handler"
+
+            # Data segments (train, validation, test)
+            segments:
+              train: ("2020-01-01", "2022-01-01")
+              valid: ("2022-01-01", "2022-07-01")
+              test: ("2022-07-01", "2023-01-01")
+
+      # Rolling configuration
+      rolling_config:
+        # Rolling step in days (550 days ≈ 2 years of trading days)
+        step: 550
+        # Rolling type: ROLL_SD (sliding window) or ROLL_EX (expanding window)
+        rtype: "ROLL_SD"
+
+    # Example: XGBoost with Alpha158
+    - name: "XGB_Alpha158"
+      enabled: false  # Set to true to enable
+      type: "RollingStrategy"
+
+      task_template:
+        model:
+          class: "XGBoostModel"
+          module_path: "qlib.contrib.model.xgboost"
+          kwargs:
+            loss: "mse"
+            colsample_bytree: 0.8879
+            learning_rate: 0.0421
+            max_depth: 8
+            n_estimators: 200
+
+        dataset:
+          class: "DatasetH"
+          module_path: "qlib.data.dataset"
+          kwargs:
+            handler:
+              class: "Alpha158"
+              module_path: "qlib.contrib.data.handler"
+            segments:
+              train: ("2020-01-01", "2022-01-01")
+              valid: ("2022-01-01", "2022-07-01")
+              test: ("2022-07-01", "2023-01-01")
+
+      rolling_config:
+        step: 550
+        rtype: "ROLL_SD"
+
+    # Example: MLP (Neural Network)
+    - name: "MLP_Alpha158"
+      enabled: false
+      type: "RollingStrategy"
+
+      task_template:
+        model:
+          class: "MLP"
+          module_path: "qlib.contrib.model.pytorch_nn"
+          kwargs:
+            d_feat: 20  # Input feature dimension
+            hidden_size: [64, 32, 1]
+            dropout: 0.2
+            lr: 0.002
+            epochs: 20
+
+        dataset:
+          class: "DatasetH"
+          module_path: "qlib.data.dataset"
+          kwargs:
+            handler:
+              class: "Alpha158"
+              module_path: "qlib.contrib.data.handler"
+              # You can reduce features for MLP
+              kwargs:
+                fit_end_dt: "2023-01-01"
+            segments:
+              train: ("2020-01-01", "2022-01-01")
+              valid: ("2022-01-01", "2022-07-01")
+              test: ("2022-07-01", "2023-01-01")
+
+      rolling_config:
+        step: 550
+        rtype: "ROLL_SD"
+
+    # Example: Custom strategy
+    # - name: "MyCustomStrategy"
+    #   enabled: false
+    #   type: "Custom"
+    #   class: "MyStrategyClass"
+    #   module_path: "my_module.strategies"
+    #   init_params:
+    #     param1: value1
+
+  # Signal configuration
+  signal_config:
+    # Ensemble method: average, weighted, best, dynamic, voting
+    ensemble_method: "average"
+
+    # Weighted ensemble configuration (only used if ensemble_method="weighted")
+    weights:
+      LGB_Alpha158: 0.5
+      XGB_Alpha158: 0.3
+      MLP_Alpha158: 0.2
+
+    # Best model configuration (only used if ensemble_method="best")
+    best_strategy: "LGB_Alpha158"
+
+    # Dynamic weight configuration (only used if ensemble_method="dynamic")
+    lookback_days: 30
+    metric: "ic"  # ic, rank_ic, sharpe
+
+    # Voting ensemble configuration (only used if ensemble_method="voting")
+    top_n: 50
+    min_votes: null  # null = majority vote
+    return_type: "weighted"  # weighted, uniform
+
+  # Signal export configuration
+  signal_export:
+    enabled: true
+    dir: "signals"
+    format: "csv"  # csv, parquet
+    export_latest: true  # Always export to signals_latest.csv
+
+# Qlib initialization configuration
+qlib_config:
+  # Data provider URI
+  provider_uri: "~/.qlib/qlib_data/cn_data"
+
+  # Region: cn, us, etc.
+  region: "cn"
+
+  # MLflow tracking URI (optional)
+  # mlflow_tracking_uri: "http://localhost:5000"
+  mlflow_tracking_uri: null
+
+  # MongoDB configuration (only required for TrainerRM or DelayTrainerRM)
+  mongo:
+    enabled: false
+    task_url: "mongodb://localhost:27017/"
+    task_db_name: "qlib_online"
+
+  # Redis configuration (optional, for caching)
+  redis:
+    enabled: false
+    host: "localhost"
+    port: 6379
+    db: 0
