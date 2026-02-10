@@ -5,8 +5,9 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "pyqlib",
+    "catboost>=1.2.8",
+    "numpy>=2.4.2",
+    "pandas>=3.0.0",
+    "pyyaml>=6.0.3",
+    "xgboost>=3.1.3",
 ]
-
-[tool.uv.sources]
-pyqlib = { path = "../qlib/dist/pyqlib-2026.2.8.dev2-cp313-cp313-macosx_15_0_arm64.whl" }

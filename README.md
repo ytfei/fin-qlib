@@ -41,7 +41,7 @@ fin-qlib/
 
 ```bash
 # Install Qlib
-pip install pyqlib
+uv pip install ../qlib/dist/pyqlib-2026.2.8.dev3-cp313-cp313-macosx_15_0_arm64.whl
 
 # Install additional dependencies
 pip install pyyaml pandas numpy
