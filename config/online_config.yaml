@@ -18,7 +18,7 @@ online_manager:
     # - TrainerRM: Trainer with MongoDB task queue (requires mongo config)
     # - DelayTrainerR: Delayed training for parallel execution
     # - DelayTrainerRM: Delayed training with MongoDB
-    type: "TrainerRM"
+    type: "TrainerR"
 
   # Strategy definitions
   strategies:
