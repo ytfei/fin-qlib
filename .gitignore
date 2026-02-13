@@ -16,3 +16,4 @@ Users/
 signals/
 checkpoints/
 .DS_Store
+*.db

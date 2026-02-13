@@ -1,0 +1,73 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# GitHub
+.github
+CODEOWNERS
+
+# Documentation
+*.md
+!README.md
+docs/
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Project specific
+checkpoints/*
+!checkpoints/.gitkeep
+logs/*
+!logs/.gitkeep
+signals/*
+!signals/.gitkeep
+mlruns/*
+!mlruns/.gitkeep
+*.db
+*.sqlite
+
+# Qlib data
+.qlib/
+
+# MLflow
+mlflow.db
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Scripts (deployment only)
+deploy.sh
