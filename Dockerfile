@@ -17,14 +17,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy dependency files
-COPY pyproject.toml uv.lock requirements.txt ./
+# 重命名 pyqlib-2026.2.8.whl
+COPY pyproject.toml uv.lock pyqlib-2026.2.8.whl ./
 
 # Install dependencies using uv
 # First install from pyproject.toml for core dependencies
 RUN uv sync --frozen || uv pip install -e . || echo "Continuing with requirements.txt"
 
 # Then install from requirements.txt for additional dependencies
-RUN uv pip install -r requirements.txt --system
+RUN uv pip install pyqlib-2026.2.8.whl && rm -fr pyqlib-2026.2.8.whl
 
 # Copy project files
 COPY . .
