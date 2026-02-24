@@ -24,6 +24,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import yaml
 import qlib
 from fqlib.managed_manager import ManagedOnlineManager
+from fqlib.util import init_qlib_from_config
 
 
 def reset_manager(manager_path: Path):
@@ -105,17 +106,7 @@ def main():
     print("Initializing Qlib")
     print("=" * 80)
 
-    qlib_config = config.get('qlib_config', {})
-    provider_uri = qlib_config.get('provider_uri', '~/.qlib/qlib_data/cn_data')
-    region = qlib_config.get('region', 'cn')
-
-    # MLflow configuration
-    mlflow_uri = qlib_config.get('mlflow_tracking_uri')
-    if mlflow_uri:
-        print(f"MLflow tracking URI: {mlflow_uri}")
-
-    qlib.init(provider_uri=provider_uri, region=region)
-    print("Qlib initialized successfully")
+    init_qlib_from_config(config)
 
     # Setup MLflow integration before creating manager
     print("\n" + "=" * 80)

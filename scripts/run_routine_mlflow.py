@@ -21,46 +21,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from fqlib.managed_manager import ManagedOnlineManager
+from fqlib.util import init_qlib_from_config
 import qlib
 import yaml
-
-
-def init_qlib_from_config(config: dict):
-    """Initialize Qlib based on configuration."""
-    qlib_config = config.get('qlib_config', {})
-
-    provider_uri = qlib_config.get('provider_uri', '~/.qlib/qlib_data/cn_data')
-    region = qlib_config.get('region', 'cn')
-
-    # Build initialization kwargs
-    init_kwargs = {
-        'provider_uri': provider_uri,
-        'region': region,
-    }
-
-    # MLflow configuration
-    mlflow_uri = qlib_config.get('mlflow_tracking_uri')
-    if mlflow_uri:
-        init_kwargs['flask_server'] = True
-        init_kwargs['mlflow_tracking_uri'] = mlflow_uri
-        print(f"MLflow tracking URI: {mlflow_uri}")
-
-    # MongoDB configuration
-    mongo_config = qlib_config.get('mongo', {})
-    if mongo_config.get('enabled', False):
-        init_kwargs['mongo'] = {
-            'task_url': mongo_config.get('task_url'),
-            'task_db_name': mongo_config.get('task_db_name'),
-        }
-        print(f"MongoDB enabled: {mongo_config['task_url']}")
-
-    # Initialize Qlib
-    try:
-        qlib.init(**init_kwargs)
-        print("Qlib initialized successfully")
-    except Exception as e:
-        print(f"Failed to initialize Qlib: {e}")
-        raise
 
 
 def setup_mlflow_integration(manager, mlflow_config: dict):

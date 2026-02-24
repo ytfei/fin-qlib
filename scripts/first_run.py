@@ -24,6 +24,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import yaml
 import qlib
 from fqlib.managed_manager import ManagedOnlineManager
+from fqlib.util import init_qlib_from_config
 
 
 def reset_manager(manager_path: Path):
@@ -116,24 +117,7 @@ Examples:
     print("Initializing Qlib")
     print("=" * 80)
 
-    qlib_config = config.get('qlib_config', {})
-    provider_uri = qlib_config.get('provider_uri', '~/.qlib/qlib_data/cn_data')
-    region = qlib_config.get('region', 'cn')
-
-    # Load MongoDB configuration if enabled
-    mongo_config = qlib_config.get('mongo', {})
-    if mongo_config.get('enabled', False):
-        mongo_conf = {
-            "task_url": mongo_config.get('task_url', 'mongodb://localhost:27017/'),
-            "task_db_name": mongo_config.get('task_db_name', 'qlib_online'),
-        }
-        print(f"MongoDB enabled: {mongo_conf['task_url']}")
-        qlib.init(provider_uri=provider_uri, region=region, mongo=mongo_conf)
-    else:
-        print("MongoDB disabled (using MLflow only)")
-        qlib.init(provider_uri=provider_uri, region=region)
-
-    print("Qlib initialized successfully")
+    init_qlib_from_config(config)
 
     # Create manager (strategies are initialized but not trained yet)
     print("\n" + "=" * 80)

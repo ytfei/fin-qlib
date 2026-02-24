@@ -188,3 +188,11 @@ qlib_config:
     host: "localhost"
     port: 6379
     db: 0
+
+  exp_manager:
+    enabled: true
+    class: MLflowExpManager
+    module_path: qlib.workflow.expm
+    kwargs:
+        uri: sqlite:///data/mlflow.db
+        default_exp_name: Experiment

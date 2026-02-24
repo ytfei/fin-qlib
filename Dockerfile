@@ -18,7 +18,7 @@ WORKDIR /app
 #    && rm -rf /var/lib/apt/lists/*
 
 # Copy dependency files
-# 不用重命名
+# 不用重命名 pyqlib
 COPY pyproject.toml uv.lock pyqlib-2026.2.8.* ./
 
 # Install dependencies using uv
@@ -26,13 +26,13 @@ COPY pyproject.toml uv.lock pyqlib-2026.2.8.* ./
 RUN uv sync --frozen || uv pip install -e . || echo "Continuing with requirements.txt"
 
 # Then install from requirements.txt for additional dependencies
-RUN uv pip install pyqlib-2026.2.8.*.whl 
+RUN uv pip install pyqlib-2026.2.8.*.whl
 
 # Copy project files
 COPY . .
 
 # Create necessary directories
-RUN mkdir -p checkpoints logs signals config mlruns
+RUN mkdir -p data config
 
 # Make scripts executable
 RUN chmod +x scripts/*.py 2>/dev/null || true
