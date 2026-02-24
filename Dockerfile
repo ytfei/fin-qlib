@@ -32,7 +32,6 @@ COPY . .
 RUN uv sync --frozen \
     && uv pip install pyqlib-*.whl \
     && rm -fr pyqlib-*.whl \
-    && uv pip install -e . \
     && mkdir -p data config
 
 # Make scripts executable
