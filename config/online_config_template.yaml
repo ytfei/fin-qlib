@@ -3,7 +3,7 @@
 
 online_manager:
   # Path to save/load manager checkpoint
-  manager_path: "checkpoints/online_manager.pkl"
+  manager_path: "data/checkpoints/online_manager.pkl"
 
   # Initial begin time (None for latest)
   begin_time: null
@@ -184,7 +184,7 @@ online_manager:
   # Signal export configuration
   signal_export:
     enabled: true
-    dir: "signals"
+    dir: "data/signals"
     format: "csv"  # csv, parquet
     export_latest: true  # Always export to signals_latest.csv
 

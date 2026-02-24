@@ -1,7 +1,7 @@
 # Simple configuration for testing/development
 
 online_manager:
-  manager_path: "checkpoints/online_manager.pkl"
+  manager_path: "data/checkpoints/online_manager.pkl"
   begin_time: null
   freq: "day"
 
@@ -53,7 +53,7 @@ online_manager:
 
   signal_export:
     enabled: true
-    dir: "signals"
+    dir: "data/signals"
     format: "csv"
     export_latest: true
 

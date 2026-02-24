@@ -89,7 +89,7 @@ def main():
 
     # Load manager
     manager_path_str = args.manager_path or config['online_manager'].get('manager_path',
-                                                                         'checkpoints/online_manager.pkl')
+                                                                         'data/checkpoints/online_manager.pkl')
     manager_path = Path(manager_path_str)
 
     if not manager_path.exists():

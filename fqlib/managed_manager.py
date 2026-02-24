@@ -59,7 +59,7 @@ class ManagedOnlineManager:
         manager.run_routine()
     """
 
-    def __init__(self, config_path: str, log_dir: str = "logs"):
+    def __init__(self, config_path: str, log_dir: str = "data/logs"):
         """
         Initialize ManagedOnlineManager from configuration file.
 
@@ -138,7 +138,7 @@ class ManagedOnlineManager:
         Load existing OnlineManager from checkpoint or create new one.
         """
         manager_path = self.config['online_manager'].get('manager_path',
-                                                          'checkpoints/online_manager.pkl')
+                                                          'data/checkpoints/online_manager.pkl')
         manager_path = Path(manager_path)
 
         # Ensure checkpoint directory exists
@@ -305,7 +305,7 @@ class ManagedOnlineManager:
             "manager_config": {
                 "begin_time": manager_config.get('begin_time'),
                 "freq": manager_config.get('freq', 'day'),
-                "manager_path": manager_config.get('manager_path', 'checkpoints/online_manager.pkl'),
+                "manager_path": manager_config.get('manager_path', 'data/checkpoints/online_manager.pkl'),
             },
             "strategies": []
         }
@@ -572,7 +572,7 @@ class ManagedOnlineManager:
     def _save_checkpoint(self):
         """Save manager checkpoint."""
         manager_path = self.config['online_manager'].get('manager_path',
-                                                          'checkpoints/online_manager.pkl')
+                                                          'data/checkpoints/online_manager.pkl')
         self.manager.to_pickle(manager_path)
         self.logger.info(f"Checkpoint saved to {manager_path}")
 
@@ -584,7 +584,7 @@ class ManagedOnlineManager:
             return
 
         # Export directory
-        export_dir = Path(export_config.get('dir', 'signals'))
+        export_dir = Path(export_config.get('dir', 'data/signals'))
         export_dir.mkdir(parents=True, exist_ok=True)
 
         # Export format

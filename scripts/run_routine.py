@@ -14,7 +14,7 @@ Usage:
 
 Crontab example:
     # Run at 16:30 every weekday (Monday to Friday)
-    30 16 * * 1-5 cd /path/to/fin-qlib && python scripts/run_routine.py --config config/online_config.yaml >> logs/routine.log 2>&1
+    30 16 * * 1-5 cd /path/to/fin-qlib && python scripts/run_routine.py --config config/online_config.yaml >> data/logs/routine.log 2>&1
 """
 
 import argparse
@@ -133,7 +133,7 @@ Examples:
     parser.add_argument(
         '--log-dir',
         type=str,
-        default='logs',
+        default='data/logs',
         help='Log directory (default: logs)'
     )
 

@@ -2,7 +2,7 @@
 # 展示如何配置 MLflow 集成，自动记录训练和回测指标
 
 online_manager:
-  manager_path: "checkpoints/online_manager.pkl"
+  manager_path: "data/checkpoints/online_manager.pkl"
   begin_time: null
   freq: "day"
 
@@ -173,7 +173,7 @@ online_manager:
   # 信号导出配置
   signal_export:
     enabled: true
-    dir: "signals"
+    dir: "data/signals"
     format: "csv"
     export_latest: true
 

@@ -80,7 +80,7 @@ Examples:
     parser.add_argument(
         '--log-dir',
         type=str,
-        default='logs',
+        default='data/logs',
         help='Log directory (default: logs)'
     )
 
@@ -99,7 +99,7 @@ Examples:
         config = yaml.safe_load(f)
 
     # Check if reset requested
-    manager_path_str = config['online_manager'].get('manager_path', 'checkpoints/online_manager.pkl')
+    manager_path_str = config['online_manager'].get('manager_path', 'data/checkpoints/online_manager.pkl')
     manager_path = Path(manager_path_str)
 
     if args.reset:
@@ -170,7 +170,7 @@ Examples:
         print("=" * 80)
         print("1. Review the trained models and predictions")
         print("2. Set up cron job for daily routine:")
-        print("   30 16 * * 1-5 cd $(pwd) && python scripts/run_routine.py --config config/online_config.yaml >> logs/routine.log 2>&1")
+        print("   30 16 * * 1-5 cd $(pwd) && python scripts/run_routine.py --config config/online_config.yaml >> data/logs/routine.log 2>&1")
         print("3. Or run manually:")
         print("   python scripts/run_routine.py --config config/online_config.yaml")
 

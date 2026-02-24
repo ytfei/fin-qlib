@@ -37,7 +37,9 @@ RUN mkdir -p checkpoints logs signals config mlruns
 # Make scripts executable
 RUN chmod +x scripts/*.py 2>/dev/null || true
 
-VOLUME ["/app/checkpoints", "/app/logs", "/app/signals", "/app/mlflow_data/", "/app/config"]
+# /app/config 是输入配置
+# /app/data 是输出结果
+VOLUME ["/app/config", "/app/data/"]
 
 # Set the default command
 CMD ["uv", "run", "python", "scripts/run_routine.py", "--config", "config/online_config.yaml"]

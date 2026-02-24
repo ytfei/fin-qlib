@@ -99,7 +99,7 @@ def cleanup_logs(days=7):
     import time
     from datetime import timedelta
 
-    log_dir = Path("logs")
+    log_dir = Path("data/logs")
     if not log_dir.exists():
         print("  No logs directory found")
         return

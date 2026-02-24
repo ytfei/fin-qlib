@@ -9,11 +9,13 @@ wheels/
 # Virtual environments
 .venv
 
-logs/
+data/logs/
 *.log
-mlruns/
+data/mlflow_data/
+data/mlruns/
 Users/
-signals/
-checkpoints/
+data/signals/
+data/checkpoints/
 .DS_Store
 *.db
+data/

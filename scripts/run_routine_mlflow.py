@@ -224,7 +224,7 @@ def main():
     parser.add_argument(
         '--log-dir',
         type=str,
-        default='logs',
+        default='data/logs',
         help='Log directory (default: logs)'
     )
 
