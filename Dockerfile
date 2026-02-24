@@ -17,22 +17,23 @@ WORKDIR /app
 #    g++ \
 #    && rm -rf /var/lib/apt/lists/*
 
-# Copy dependency files
-# 不用重命名 pyqlib
-COPY pyproject.toml uv.lock pyqlib-2026.2.8.* ./
+# Copy pyqlib wheel package (built in CI/CD)
+# COPY pyqlib-*.whl /tmp/
+
+# # Copy dependency files
+# COPY pyproject.toml uv.lock ./
+
+# Copy project files
+# 依赖的本地pyqlib-*.whl 是在CI/CD中构建的，会在 CI/CD中自动下载到这里
+COPY . .
 
 # Install dependencies using uv
 # First install from pyproject.toml for core dependencies
-RUN uv sync --frozen || uv pip install -e . || echo "Continuing with requirements.txt"
-
-# Then install from requirements.txt for additional dependencies
-RUN uv pip install pyqlib-2026.2.8.*.whl
-
-# Copy project files
-COPY . .
-
-# Create necessary directories
-RUN mkdir -p data config
+RUN uv pip install pyqlib-*.whl \
+    && rm -fr pyqlib-*.whl \
+    && uv sync --frozen \
+    && uv pip install -e . \
+    && mkdir -p data config
 
 # Make scripts executable
 RUN chmod +x scripts/*.py 2>/dev/null || true

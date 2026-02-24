@@ -177,9 +177,11 @@ qlib_config:
 
   # MongoDB configuration (only required for TrainerRM or DelayTrainerRM)
   mongo:
-    enabled: true
+    enabled: false  # Set to true if using MongoDB
     # MongoDB connection string format: mongodb://[username:password@]host[:port][/database][?options]
-    task_url: "mongodb://admin:admin@127.0.0.1:27017/qlib_online?authSource=admin"
+    # IMPORTANT: Use environment variables for credentials in production
+    # Example: task_url: "mongodb://${MONGO_USER}:${MONGO_PASS}@127.0.0.1:27017/qlib_online?authSource=admin"
+    task_url: "mongodb://localhost:27017/"
     task_db_name: "qlib_online"
 
   # Redis configuration (optional, for caching)
