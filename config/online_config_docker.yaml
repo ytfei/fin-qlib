@@ -1,0 +1,200 @@
+# Qlib Online Manager Configuration Template
+# Copy this file to online_config.yaml and customize for your needs
+
+online_manager:
+  # Path to save/load manager checkpoint
+  manager_path: "data/checkpoints/online_manager.pkl"
+
+  # Initial begin time (None for latest)
+  begin_time: null
+
+  # Data frequency (day, minute, etc.)
+  freq: "day"
+
+  # Trainer configuration
+  trainer:
+    # Options: TrainerR, TrainerRM, DelayTrainerR, DelayTrainerRM
+    # - TrainerR: Simple trainer with MLflow recorder
+    # - TrainerRM: Trainer with MongoDB task queue (requires mongo config)
+    # - DelayTrainerR: Delayed training for parallel execution
+    # - DelayTrainerRM: Delayed training with MongoDB
+    type: "TrainerR"
+
+  # Strategy definitions
+  strategies:
+    # Example: LightGBM with Alpha158 features
+    - name: "LGB_Alpha158"
+      enabled: true
+      type: "RollingStrategy"
+
+      # Task template (model + dataset configuration)
+      task_template:
+        model:
+          class: "LGBModel"
+          module_path: "qlib.contrib.model.gbdt"
+          kwargs:
+            loss: "mse"
+            colsample_bytree: 0.8879
+            learning_rate: 0.0421
+            subsample: 0.8789
+            lambda_l1: 0.0
+            lambda_l2: 0.0
+            max_depth: 8
+            num_leaves: 210
+            num_threads: 4  # 减少线程数以降低内存占用 (原值: 20)
+
+        dataset:
+          class: "DatasetH"
+          module_path: "qlib.data.dataset"
+          kwargs:
+            handler:
+              class: "Alpha158"
+              module_path: "qlib.contrib.data.handler"
+
+            # Data segments (train, validation, test)
+            segments:
+              train: [2020-01-01, 2024-01-01]
+              valid: [2024-01-01, 2025-01-01]
+              test: [2025-01-01, 2026-01-01]
+
+        # Record configuration for logging predictions
+        # NOTE: Qlib uses 'record' (singular) not 'recorder'
+        record:
+          # 1. SignalRecord - Save predictions as PKL (standard format)
+          - class: SignalRecord
+            module_path: qlib.workflow.record_temp
+            kwargs:
+              model: <MODEL>
+              dataset: <DATASET>
+
+          # 2. SigAnaRecord - Signal analysis (IC, ICIR, etc.)
+          - class: SigAnaRecord
+            module_path: qlib.workflow.record_temp
+            kwargs:
+              ann_scaler: 252
+              ana_long_short: false
+
+      # Rolling configuration
+      rolling_config:
+        # Rolling step in days (减少滚动频率以降低内存压力)
+        # 原值: 10 天 (会产生大量任务)
+        # 建议: 30-90 天 (trade-off: 更少任务 vs 更新频率)
+        step: 90
+        # Rolling type: ROLL_SD (sliding window) or ROLL_EX (expanding window)
+        rtype: "ROLL_SD"
+
+    # Example: XGBoost with Alpha158
+    - name: "XGB_Alpha158"
+      enabled: false  # Set to true to enable
+      type: "RollingStrategy"
+
+      task_template:
+        model:
+          class: "XGBoostModel"
+          module_path: "qlib.contrib.model.xgboost"
+          kwargs:
+            loss: "mse"
+            colsample_bytree: 0.8879
+            learning_rate: 0.0421
+            max_depth: 8
+            n_estimators: 200
+
+        dataset:
+          class: "DatasetH"
+          module_path: "qlib.data.dataset"
+          kwargs:
+            handler:
+              class: "Alpha158"
+              module_path: "qlib.contrib.data.handler"
+            segments:
+              train: [2020-01-01, 2024-01-01]
+              valid: [2024-01-01, 2025-01-01]
+              test: [2025-01-01, 2026-01-01]
+
+        # Recorder configuration for logging predictions and signals
+        # Record configuration for logging predictions
+        # NOTE: Qlib uses 'record' (singular) not 'recorder'
+        record:
+          # 1. SignalRecord - Save predictions as PKL (standard format)
+          - class: SignalRecord
+            module_path: qlib.workflow.record_temp
+            kwargs:
+              model: <MODEL>
+              dataset: <DATASET>
+
+          # 2. SigAnaRecord - Signal analysis (IC, ICIR, etc.)
+          - class: SigAnaRecord
+            module_path: qlib.workflow.record_temp
+            kwargs:
+              ann_scaler: 252
+              ana_long_short: false
+
+      rolling_config:
+        step: 22
+        rtype: "ROLL_SD"
+
+  # Signal configuration
+  signal_config:
+    # Ensemble method: average, weighted, best, dynamic, voting
+    ensemble_method: "average"
+
+    # Weighted ensemble configuration (only used if ensemble_method="weighted")
+    weights:
+      LGB_Alpha158: 0.5
+      XGB_Alpha158: 0.3
+      MLP_Alpha158: 0.2
+
+    # Best model configuration (only used if ensemble_method="best")
+    best_strategy: "LGB_Alpha158"
+
+    # Dynamic weight configuration (only used if ensemble_method="dynamic")
+    lookback_days: 30
+    metric: "ic"  # ic, rank_ic, sharpe
+
+    # Voting ensemble configuration (only used if ensemble_method="voting")
+    top_n: 50
+    min_votes: null  # null = majority vote
+    return_type: "weighted"  # weighted, uniform
+
+  # Signal export configuration
+  signal_export:
+    enabled: true
+    dir: "data/signals"
+    format: "csv"  # csv, parquet
+    export_latest: true  # Always export to signals_latest.csv
+
+# Qlib initialization configuration
+qlib_config:
+  # Data provider URI
+  provider_uri: "/app/qlib_data/cn_data"
+
+  # Region: cn, us, etc.
+  region: "cn"
+
+  # MLflow tracking URI (optional)
+  # mlflow_tracking_uri: "http://localhost:5000"
+  mlflow_tracking_uri: null
+
+  # MongoDB configuration (only required for TrainerRM or DelayTrainerRM)
+  mongo:
+    enabled: false  # Set to true if using MongoDB
+    # MongoDB connection string format: mongodb://[username:password@]host[:port][/database][?options]
+    # IMPORTANT: Use environment variables for credentials in production
+    # Example: task_url: "mongodb://${MONGO_USER}:${MONGO_PASS}@127.0.0.1:27017/qlib_online?authSource=admin"
+    task_url: "mongodb://localhost:27017/"
+    task_db_name: "qlib_online"
+
+  # Redis configuration (optional, for caching)
+  redis:
+    enabled: false
+    host: "localhost"
+    port: 6379
+    db: 0
+
+  exp_manager:
+    enabled: true
+    class: MLflowExpManager
+    module_path: qlib.workflow.expm
+    kwargs:
+        uri: sqlite:///data/mlflow.db
+        default_exp_name: Experiment
