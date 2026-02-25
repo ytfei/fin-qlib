@@ -1,0 +1,39 @@
+ContainerGroupName: eci-fin-qlib
+Container:
+- Name: fin-qlib
+  Image: ghcr.io/ytfei/fin-qlib:latest
+  Cpu: "2"
+  # Gpu: "0.25"
+  Memory: "2"
+  Command: ["bash", "-c", "while true; do date; sleep 10; done"]
+  # Command: ["uv", "run", "python", "scripts/run_routine.py", "--config", "config/online_config_docker.yaml"]
+  ImagePullPolicy: IfNotPresent
+  VolumeMount:
+  - Name: nas-qlib-data
+    MountPath: /app/qlib_data/
+    ReadOnly: false
+  - Name: nas-run-qlib-config
+    MountPath: /app/config/
+    ReadOnly: false
+  - Name: nas-run-qlib-data
+    MountPath: /app/data/
+    ReadOnly: false
+Volume:
+- Name: nas-qlib-data
+  Type: NFSVolume
+  NFSVolume:
+    Server: 12f70149f0a-aqc48.cn-hongkong.nas.aliyuncs.com
+    Path: /qlib_data/qlib_data/tushare_data/
+    ReadOnly: false
+- Name: nas-run-qlib-config
+  Type: NFSVolume
+  NFSVolume:
+    Server: 12f70149f0a-aqc48.cn-hongkong.nas.aliyuncs.com
+    Path: /qlib_data/run_qlib/config
+    ReadOnly: false
+- Name: nas-run-qlib-data
+  Type: NFSVolume
+  NFSVolume:
+    Server: 12f70149f0a-aqc48.cn-hongkong.nas.aliyuncs.com
+    Path: /qlib_data/run_qlib/data
+    ReadOnly: false
