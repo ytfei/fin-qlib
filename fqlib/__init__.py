@@ -18,6 +18,7 @@ from .ensemble import (
     SignalEvaluator
 )
 from .prediction_service import PredictionService
+from .api_client import StockPredictionClient
 
 # Define __all__ first
 __all__ = [
@@ -28,6 +29,7 @@ __all__ = [
     "VotingEnsemble",
     "SignalEvaluator",
     "PredictionService",
+    "StockPredictionClient",
 ]
 
 # API server (optional - requires fastapi)

@@ -27,7 +27,58 @@ python scripts/start_api_server.py
 
 ---
 
-## 2. 使用客户端
+## 2. 使用Python SDK（推荐）
+
+### 安装
+
+SDK 已包含在 `fqlib` 包中：
+
+```python
+from fqlib import StockPredictionClient
+```
+
+### 快速示例
+
+```python
+from fqlib import StockPredictionClient
+
+# 创建客户端（支持 context manager）
+with StockPredictionClient("http://localhost:8000") as client:
+
+    # 健康检查
+    if client.is_healthy():
+        print("✅ Service is healthy")
+
+    # 获取预测
+    result = client.get_predictions("2025-01-15", top_n=10)
+
+    print(f"Total predictions: {result['total_count']}")
+    for pred in result['predictions']:
+        print(f"  {pred['instrument']}: {pred['score']:.6f}")
+```
+
+### 更多功能
+
+```python
+# 获取可用日期
+dates = client.get_available_dates()
+print(f"Available dates: {dates[0]} to {dates[-1]}")
+
+# 批量查询
+batch = client.batch_get_predictions("2025-01-10", "2025-01-15")
+for date_pred in batch['predictions']:
+    print(f"{date_pred['date']}: {date_pred['total_count']} predictions")
+
+# 汇总统计
+summary = client.get_prediction_summary("2025-01-15")
+print(f"Mean score: {summary['score_stats']['mean']:.6f}")
+```
+
+详细文档请查看 [API_CLIENT_GUIDE.md](API_CLIENT_GUIDE.md)
+
+---
+
+## 3. 使用命令行工具
 
 ### 查看服务状态
 
@@ -71,7 +122,7 @@ python scripts/prediction_api_client.py export \
 
 ---
 
-## 3. 测试API服务
+## 4. 测试API服务
 
 ### 随机测试（推荐）
 
@@ -147,7 +198,7 @@ python scripts/test_api_client.py --seed 42 --samples 5
 
 ---
 
-## 4. API接口
+## 5. API接口
 
 ### 使用curl
 
@@ -178,7 +229,7 @@ for pred in data['predictions']:
 
 ---
 
-## 4. 常见问题
+## 6. 常见问题
 
 ### Q: 服务启动失败？
 ```bash

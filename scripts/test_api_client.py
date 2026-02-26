@@ -20,7 +20,7 @@ import sys
 import random
 from typing import List
 
-import requests
+from fqlib.api_client import StockPredictionClient, HTTPError, ConnectionError
 
 
 def print_header(title: str, width: int = 80):
@@ -47,46 +47,38 @@ class APITester:
         Args:
             base_url: API服务器地址
         """
-        self.base_url = base_url.rstrip('/')
-        self.session = requests.Session()
+        self.client = StockPredictionClient(base_url)
 
     def test_health(self) -> bool:
         """测试健康检查"""
         try:
-            response = self.session.get(f"{self.base_url}/health", timeout=5)
-            response.raise_for_status()
-            data = response.json()
+            health = self.client.health()
 
             print("\n✅ 健康检查通过")
-            print(f"   状态: {data['status']}")
-            print(f"   管理器已加载: {data['manager_loaded']}")
-            print(f"   当前时间: {data.get('current_time', 'N/A')}")
-            print(f"   策略: {', '.join(data.get('strategies', []))}")
+            print(f"   状态: {health['status']}")
+            print(f"   管理器已加载: {health['manager_loaded']}")
+            print(f"   当前时间: {health.get('current_time', 'N/A')}")
+            print(f"   策略: {', '.join(health.get('strategies', []))}")
 
-            return data['status'] == 'healthy'
+            return health['status'] == 'healthy'
 
-        except Exception as e:
+        except (ConnectionError, HTTPError) as e:
             print(f"\n❌ 健康检查失败: {e}")
             return False
 
     def test_status(self) -> dict:
         """测试状态接口"""
         try:
-            response = self.session.get(f"{self.base_url}/status", timeout=10)
-            response.raise_for_status()
-            return response.json()
-        except Exception as e:
+            return self.client.get_status()
+        except (ConnectionError, HTTPError) as e:
             print(f"❌ 获取状态失败: {e}")
             return {}
 
     def get_available_dates(self) -> List[str]:
         """获取可用日期列表"""
         try:
-            response = self.session.get(f"{self.base_url}/dates", timeout=10)
-            response.raise_for_status()
-            data = response.json()
-            return data.get('dates', [])
-        except Exception as e:
+            return self.client.get_available_dates()
+        except (ConnectionError, HTTPError) as e:
             print(f"❌ 获取日期列表失败: {e}")
             return []
 
@@ -102,23 +94,11 @@ class APITester:
             预测结果
         """
         try:
-            params = {"date": date}
-            if top_n:
-                params["top_n"] = top_n
-
-            response = self.session.get(
-                f"{self.base_url}/predictions",
-                params=params,
-                timeout=30
-            )
-            response.raise_for_status()
-            return response.json()
-
-        except requests.exceptions.HTTPError as e:
-            error_data = e.response.json()
-            print(f"   ❌ HTTP错误 {e.response.status_code}: {error_data.get('detail', error_data)}")
+            return self.client.get_predictions(date, top_n=top_n)
+        except HTTPError as e:
+            print(f"   ❌ HTTP错误: {e}")
             return None
-        except Exception as e:
+        except (ConnectionError, Exception) as e:
             print(f"   ❌ 请求失败: {e}")
             return None
 
@@ -183,12 +163,12 @@ class APITester:
 
                 # 显示统计信息
                 total = result['total_count']
-                returned = len(result['predictions'])
-                top_preds = result.get('top_n', [])
+                predictions = result['predictions']
+                top_preds = predictions[:10]
 
                 print(f"   ✅ 成功")
                 print(f"   总预测数: {total:,}")
-                print(f"   返回结果: {returned}")
+                print(f"   返回结果: {len(predictions)}")
 
                 # 显示Top 5
                 if top_preds:
@@ -201,7 +181,27 @@ class APITester:
             else:
                 fail_count += 1
 
-        # 6. 总结
+        # 6. 测试汇总统计
+        print_subheader("汇总统计测试")
+
+        # 选择一个日期测试统计功能
+        test_date = selected_dates[0]
+        try:
+            summary = self.client.get_prediction_summary(test_date)
+            print(f"\n日期: {summary['date']}")
+            print(f"总预测数: {summary['total_count']:,}")
+
+            if summary['score_stats']:
+                stats = summary['score_stats']
+                print(f"\n分数统计:")
+                print(f"  均值: {stats['mean']:.6f}")
+                print(f"  标准差: {stats['std']:.6f}")
+                print(f"  最小值: {stats['min']:.6f}")
+                print(f"  最大值: {stats['max']:.6f}")
+        except Exception as e:
+            print(f"⚠️  无法获取汇总统计: {e}")
+
+        # 7. 总结
         print_header("测试总结")
         print(f"\n测试日期数: {sample_count}")
         print(f"成功: {success_count} ✅")
@@ -212,6 +212,18 @@ class APITester:
             print("\n🎉 所有测试通过！")
         else:
             print(f"\n⚠️  有 {fail_count} 个测试失败")
+
+    def close(self):
+        """关闭客户端"""
+        self.client.close()
+
+    def __enter__(self):
+        """Context manager entry"""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit"""
+        self.close()
 
 
 def main():
@@ -253,12 +265,11 @@ def main():
         random.seed(args.seed)
         print(f"使用随机种子: {args.seed}")
 
-    # 创建测试器
-    tester = APITester(base_url=args.url)
-
-    # 运行测试
+    # 使用 context manager 创建测试器
     try:
-        tester.run_random_tests(sample_count=args.samples, top_n=args.top_n)
+        with APITester(base_url=args.url) as tester:
+            tester.run_random_tests(sample_count=args.samples, top_n=args.top_n)
+
     except KeyboardInterrupt:
         print("\n\n⚠️  测试被用户中断")
         sys.exit(1)
