@@ -29,6 +29,7 @@ import qlib
 from qlib.workflow.online.manager import OnlineManager
 from qlib.workflow.online.strategy import OnlineStrategy, RollingStrategy
 from qlib.workflow.task.gen import RollingGen
+from qlib.workflow.online.utils import list_recorders
 from qlib.model.trainer import TrainerR, TrainerRM, DelayTrainerR, DelayTrainerRM
 from qlib.workflow import R
 
@@ -611,18 +612,20 @@ class ManagedOnlineManager:
             strat_name = strategy.name_id
             self.logger.info(f"Processing strategy: {strat_name}")
 
-            # Get all online models (recorders) for this strategy
-            online_models = strategy.tool.online_models()
+            # Get ALL models (including offline ones) for complete historical data
+            # Use list_recorders with rec_filter_func=None to get all recorders
+            exp_name = strategy.tool._get_exp_name(None)
+            all_recorders = list(list_recorders(exp_name, rec_filter_func=None).values())
 
-            if not online_models:
-                self.logger.warning(f"No online models found for strategy {strat_name}")
+            if not all_recorders:
+                self.logger.warning(f"No recorders found for strategy {strat_name}")
                 continue
 
-            self.logger.info(f"Found {len(online_models)} online models for {strat_name}")
+            self.logger.info(f"Found {len(all_recorders)} total recorders for {strat_name}")
 
             strategy_preds = []
 
-            for model_rec in online_models:
+            for model_rec in all_recorders:
                 try:
                     # Load predictions from recorder
                     pred = model_rec.load_object("pred.pkl")

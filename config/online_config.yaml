@@ -169,7 +169,7 @@ online_manager:
 # Qlib initialization configuration
 qlib_config:
   # Data provider URI
-  provider_uri: "~/.qlib/qlib_data/cn_data"
+  provider_uri: "~/.qlib/tushare_data/cn_data"
 
   # Region: cn, us, etc.
   region: "cn"

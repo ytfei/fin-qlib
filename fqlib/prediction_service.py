@@ -37,7 +37,8 @@ class PredictionService:
     def __init__(
         self,
         config_path: str = "config/online_config.yaml",
-        log_dir: str = "data/logs"
+        log_dir: str = "data/logs",
+        signal_file: str = "data/signals/signals_history.csv"
     ):
         """
         Initialize the prediction service.
@@ -45,9 +46,11 @@ class PredictionService:
         Args:
             config_path: Path to the configuration file
             log_dir: Directory for log files
+            signal_file: Path to the historical signals CSV file
         """
         self.config_path = Path(config_path)
         self.log_dir = Path(log_dir)
+        self.signal_file = Path(signal_file)
         self.log_dir.mkdir(parents=True, exist_ok=True)
 
         # Setup logging
@@ -58,6 +61,10 @@ class PredictionService:
 
         # Load manager
         self.manager = self._load_manager()
+
+        # Load historical signals from CSV
+        self._historical_signals = None
+        self._load_historical_signals()
 
         self.logger.info("PredictionService initialized successfully")
 
@@ -134,6 +141,51 @@ class PredictionService:
             self.logger.error(f"Failed to load manager: {e}")
             raise
 
+    def _load_historical_signals(self):
+        """
+        Load historical signals from CSV file.
+
+        This loads the complete historical predictions from signals_history.csv
+        for fast querying without needing to access the manager.
+        """
+        try:
+            if not self.signal_file.exists():
+                self.logger.warning(f"Signal file not found: {self.signal_file}")
+                self._historical_signals = pd.DataFrame()
+                return
+
+            self.logger.info(f"Loading historical signals from {self.signal_file}")
+
+            # Read CSV with proper datetime parsing
+            df = pd.read_csv(self.signal_file)
+
+            # Parse datetime column
+            df['datetime'] = pd.to_datetime(df['datetime'])
+
+            # Get the score column (last column, typically named '0' or 'score')
+            score_col = df.columns[-1]
+
+            # Rename score column to 'score' for clarity
+            df = df.rename(columns={score_col: 'score'})
+
+            self._historical_signals = df
+
+            # Log statistics
+            if len(df) > 0:
+                dates = df['datetime'].dt.date.unique()
+                self.logger.info(f"Loaded {len(df):,} predictions covering {len(dates)} dates")
+                self.logger.info(f"Date range: {dates.min()} to {dates.max()}")
+            else:
+                self.logger.warning("No historical signals loaded")
+
+        except Exception as e:
+            self.logger.error(f"Failed to load historical signals: {e}")
+            self._historical_signals = pd.DataFrame()
+
+    def reload_historical_signals(self):
+        """Reload historical signals from CSV file."""
+        self._load_historical_signals()
+
     def get_predictions(
         self,
         date: str,
@@ -156,32 +208,22 @@ class PredictionService:
         self.logger.info(f"Getting predictions for date: {date}")
 
         try:
-            # Get signals from manager
-            signals = self.manager.get_signals()
+            # Check if historical signals are loaded
+            if self._historical_signals is None or len(self._historical_signals) == 0:
+                raise ValueError("No historical signals available")
 
-            if signals is None or len(signals) == 0:
-                raise ValueError("No signals available in manager")
+            # Parse date string to datetime for comparison
+            target_date = pd.to_datetime(date).date()
 
             # Filter by date
-            if isinstance(signals.index, MultiIndex):
-                # MultiIndex: (instrument, datetime)
-                date_signals = signals[signals.index.get_level_values('datetime') == date]
-            else:
-                # Try to filter directly
-                date_signals = signals.get(date, pd.Series())
+            date_mask = self._historical_signals['datetime'].dt.date == target_date
+            date_signals = self._historical_signals[date_mask].copy()
 
-            if date_signals is None or len(date_signals) == 0:
+            if len(date_signals) == 0:
                 raise ValueError(f"No predictions available for date: {date}")
 
-            # Convert to DataFrame
-            result_df = pd.DataFrame({
-                'instrument': date_signals.index.get_level_values('instrument')
-                if isinstance(date_signals.index, MultiIndex)
-                else date_signals.index,
-                'score': date_signals.values
-            })
-
-            # Sort by score (descending)
+            # Select columns and sort by score (descending)
+            result_df = date_signals[['instrument', 'score']].copy()
             result_df = result_df.sort_values('score', ascending=False).reset_index(drop=True)
 
             # Add rank if requested
@@ -205,19 +247,14 @@ class PredictionService:
             List of dates in YYYY-MM-DD format
         """
         try:
-            signals = self.manager.get_signals()
-
-            if signals is None or len(signals) == 0:
+            if self._historical_signals is None or len(self._historical_signals) == 0:
                 return []
 
-            if isinstance(signals.index, MultiIndex):
-                dates = signals.index.get_level_values('datetime').unique()
-            else:
-                dates = signals.index.unique()
+            # Get unique dates from the datetime column
+            dates = self._historical_signals['datetime'].dt.date.unique()
 
             # Convert to string format
-            date_strings = [str(d.date()) if hasattr(d, 'date') else str(d)
-                           for d in dates]
+            date_strings = [str(d) for d in dates]
 
             return sorted(date_strings)
 
