@@ -2,10 +2,11 @@ ContainerGroupName: eci-fin-qlib
 Container:
 - Name: fin-qlib
   Image: ghcr.io/ytfei/fin-qlib:latest
+  SpotStrategy: SpotAsPriceGo
   Cpu: "2"
   # Gpu: "0.25"
   Memory: "2"
-  Command: ["bash", "-c", "while true; do date; sleep 10; done"]
+  Command: ["bash", "-c", "date"]
   # Command: ["uv", "run", "python", "scripts/run_routine.py", "--config", "config/online_config_docker.yaml"]
   ImagePullPolicy: IfNotPresent
   VolumeMount:

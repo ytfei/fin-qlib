@@ -24,6 +24,7 @@ from datetime import datetime
 from pprint import pformat
 
 import pandas as pd
+from pandas import MultiIndex
 import qlib
 from qlib.workflow.online.manager import OnlineManager
 from qlib.workflow.online.strategy import OnlineStrategy, RollingStrategy
@@ -576,8 +577,138 @@ class ManagedOnlineManager:
         self.manager.to_pickle(manager_path)
         self.logger.info(f"Checkpoint saved to {manager_path}")
 
+    def _get_all_historical_predictions(self) -> Union[pd.Series, pd.DataFrame]:
+        """
+        Get all historical predictions from all model recorders.
+
+        This method collects predictions from all trained models across all strategies,
+        applies the configured ensemble method, and returns complete historical signals.
+
+        Returns:
+            DataFrame or Series with all historical predictions
+        """
+        self.logger.info("Collecting all historical predictions from recorders...")
+
+        all_predictions = {}  # {strategy_name: [pred1, pred2, ...]}
+
+        # Collect predictions from all strategies
+        for strategy in self.manager.strategies:
+            strat_name = strategy.name_id
+            self.logger.info(f"Processing strategy: {strat_name}")
+
+            # Get all online models (recorders) for this strategy
+            online_models = strategy.tool.online_models()
+
+            if not online_models:
+                self.logger.warning(f"No online models found for strategy {strat_name}")
+                continue
+
+            self.logger.info(f"Found {len(online_models)} online models for {strat_name}")
+
+            strategy_preds = []
+
+            for model_rec in online_models:
+                try:
+                    # Load predictions from recorder
+                    pred = model_rec.load_object("pred.pkl")
+
+                    if pred is not None and len(pred) > 0:
+                        strategy_preds.append(pred)
+                        self.logger.info(f"  Loaded predictions: {len(pred)} records, "
+                                       f"date range: {pred.index.min()} to {pred.index.max()}")
+                except Exception as e:
+                    self.logger.warning(f"  Failed to load predictions from recorder: {e}")
+                    continue
+
+            if strategy_preds:
+                all_predictions[strat_name] = strategy_preds
+
+        if not all_predictions:
+            self.logger.warning("No predictions found from any strategy")
+            return pd.Series()
+
+        # Apply ensemble method
+        ensemble_method = self._get_ensemble_method()
+
+        self.logger.info(f"Applying ensemble method: {type(ensemble_method).__name__}")
+
+        try:
+            # Concatenate all predictions from each strategy
+            strategy_signals = {}
+
+            for strat_name, preds in all_predictions.items():
+                if len(preds) == 0:
+                    continue
+
+                # Concatenate all predictions from this strategy
+                # For rolling strategy, we may have multiple predictions for the same (instrument, date)
+                # Keep the last one (most recent)
+                strat_combined = pd.concat(preds)
+                strat_combined = strat_combined[~strat_combined.index.duplicated(keep='last')]
+                strat_combined = strat_combined.sort_index()
+
+                strategy_signals[strat_name] = strat_combined
+
+                self.logger.info(f"Strategy {strat_name}: {len(strat_combined)} predictions, "
+                               f"dates: {strat_combined.index.min()} to {strat_combined.index.max()}")
+
+            # Apply ensemble method
+            if len(strategy_signals) == 0:
+                self.logger.warning("No valid strategy signals to ensemble")
+                return pd.Series()
+
+            # Use the ensemble callable directly
+            if callable(ensemble_method):
+                # The ensemble method expects a list of signals
+                signals_list = list(strategy_signals.values())
+                combined_signals = ensemble_method(signals_list)
+            else:
+                # Fallback: average ensemble
+                all_preds_df = pd.DataFrame(strategy_signals)
+                combined_signals = all_preds_df.mean(axis=1)
+
+            self.logger.info(f"Combined signals: {len(combined_signals)} total records")
+
+            # Log date range
+            if isinstance(combined_signals.index, pd.MultiIndex):
+                dates = combined_signals.index.get_level_values('datetime').unique()
+                self.logger.info(f"Date range: {dates.min()} to {dates.max()}")
+                self.logger.info(f"Total dates: {len(dates)}")
+            else:
+                dates = combined_signals.index.unique()
+                self.logger.info(f"Date range: {dates.min()} to {dates.max()}")
+                self.logger.info(f"Total dates: {len(dates)}")
+
+            return combined_signals
+
+        except Exception as e:
+            self.logger.error(f"Failed to apply ensemble: {e}", exc_info=True)
+
+            # Fallback: just concatenate all predictions
+            self.logger.info("Using simple fallback: concatenating all predictions")
+
+            all_preds = []
+            for strat_name, preds in all_predictions.items():
+                all_preds.extend(preds)
+
+            if all_preds:
+                combined = pd.concat(all_preds)
+                # Remove duplicates, keep last
+                combined = combined[~combined.index.duplicated(keep='last')]
+                combined = combined.sort_index()
+                return combined
+
+            return pd.Series()
+
     def _export_signals(self, signals: Union[pd.Series, pd.DataFrame]):
-        """Export signals to file."""
+        """
+        Export signals to file.
+
+        Exports:
+        1. Daily snapshot: signals_YYYYMMDD.csv (incremental)
+        2. Latest snapshot: signals_latest.csv (most recent)
+        3. Historical snapshot: signals_history.csv (all historical predictions)
+        """
         export_config = self.config['online_manager'].get('signal_export', {})
 
         if not export_config.get('enabled', True):
@@ -598,21 +729,91 @@ class ManagedOnlineManager:
 
         date_str = latest_date.strftime('%Y%m%d')
 
+        # 1. Export daily snapshot (incremental)
         if export_format == 'csv':
             output_path = export_dir / f"signals_{date_str}.csv"
             signals.to_csv(output_path)
-            self.logger.info(f"Signals exported to {output_path}")
+            self.logger.info(f"Daily signals exported to {output_path}")
 
         elif export_format == 'parquet':
             output_path = export_dir / f"signals_{date_str}.parquet"
             signals.to_parquet(output_path)
-            self.logger.info(f"Signals exported to {output_path}")
+            self.logger.info(f"Daily signals exported to {output_path}")
 
-        # Export latest signals
+        # 2. Export latest signals
         if export_config.get('export_latest', True):
             latest_path = export_dir / "signals_latest.csv"
             signals.to_csv(latest_path)
             self.logger.info(f"Latest signals exported to {latest_path}")
+
+        # 3. Export all historical signals (accumulate all predictions)
+        if export_config.get('export_history', True):
+            self._export_historical_signals(signals, export_dir, export_format)
+
+    def _export_historical_signals(
+        self,
+        signals: Union[pd.Series, pd.DataFrame],
+        export_dir: Path,
+        export_format: str
+    ):
+        """
+        Export all historical signals by collecting from all model recorders.
+
+        This method retrieves ALL historical predictions from all trained models,
+        applies the ensemble method, and exports the complete historical record.
+
+        Args:
+            signals: Current signals (not used for history export anymore)
+            export_dir: Directory to save the file
+            export_format: Export format ('csv' or 'parquet')
+        """
+        history_path = export_dir / f"signals_history.{export_format}"
+
+        try:
+            # Get ALL historical predictions from recorders
+            self.logger.info("=" * 80)
+            self.logger.info("EXPORTING COMPLETE HISTORICAL PREDICTIONS")
+            self.logger.info("=" * 80)
+
+            historical_signals = self._get_all_historical_predictions()
+
+            if historical_signals is None or len(historical_signals) == 0:
+                self.logger.warning("No historical signals found to export")
+                return
+
+            # Export complete historical signals
+            if export_format == 'csv':
+                historical_signals.to_csv(history_path)
+            else:  # parquet
+                historical_signals.to_parquet(history_path)
+
+            # Log summary
+            if isinstance(historical_signals.index, pd.MultiIndex):
+                date_count = len(historical_signals.index.get_level_values('datetime').unique())
+                total_count = len(historical_signals)
+                date_range = f"{historical_signals.index.get_level_values('datetime').min()} to {historical_signals.index.get_level_values('datetime').max()}"
+            else:
+                date_count = len(historical_signals.index.unique())
+                total_count = len(historical_signals)
+                date_range = f"{historical_signals.index.min()} to {historical_signals.index.max()}"
+
+            self.logger.info(f"Historical signals exported to {history_path}")
+            self.logger.info(f"  Total dates: {date_count}")
+            self.logger.info(f"  Total predictions: {total_count}")
+            self.logger.info(f"  Date range: {date_range}")
+            self.logger.info("=" * 80)
+
+        except Exception as e:
+            self.logger.error(f"Failed to export historical signals: {e}", exc_info=True)
+            # Fallback: just export current signals
+            try:
+                if export_format == 'csv':
+                    signals.to_csv(history_path)
+                else:
+                    signals.to_parquet(history_path)
+                self.logger.warning(f"Exported current signals only to {history_path}")
+            except Exception as e2:
+                self.logger.error(f"Failed to export signals to history file: {e2}")
 
     def get_signals(self) -> Union[pd.Series, pd.DataFrame]:
         """Get current signals."""

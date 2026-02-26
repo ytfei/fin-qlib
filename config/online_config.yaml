@@ -50,6 +50,8 @@ online_manager:
             handler:
               class: "Alpha158"
               module_path: "qlib.contrib.data.handler"
+              kwargs:
+                instruments: "csi300"
 
             # Data segments (train, validation, test)
             segments:
@@ -162,6 +164,7 @@ online_manager:
     dir: "data/signals"
     format: "csv"  # csv, parquet
     export_latest: true  # Always export to signals_latest.csv
+    export_history: true  # Export all historical signals to signals_history.csv
 
 # Qlib initialization configuration
 qlib_config:
@@ -196,5 +199,5 @@ qlib_config:
     class: MLflowExpManager
     module_path: qlib.workflow.expm
     kwargs:
-        uri: sqlite:///data/mlflow.db
+        uri: data/mlruns  # 使用绝对路径或相对路径
         default_exp_name: Experiment

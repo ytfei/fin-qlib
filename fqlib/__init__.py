@@ -17,7 +17,9 @@ from .ensemble import (
     VotingEnsemble,
     SignalEvaluator
 )
+from .prediction_service import PredictionService
 
+# Define __all__ first
 __all__ = [
     "ManagedOnlineManager",
     "WeightedEnsemble",
@@ -25,7 +27,15 @@ __all__ = [
     "DynamicWeightEnsemble",
     "VotingEnsemble",
     "SignalEvaluator",
+    "PredictionService",
 ]
+
+# API server (optional - requires fastapi)
+try:
+    from .api_server import app
+    __all__.append("app")
+except ImportError:
+    pass  # FastAPI is optional
 
 # MLflow integration (optional - requires mlflow)
 try:
