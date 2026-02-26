@@ -1,0 +1,54 @@
+# 回测配置文件
+# 使用方法: python -m fqlib.run_backtest --config config/backtest_config.yaml
+
+# 策略配置
+strategy:
+  # 策略类型: topk_dropout, topk, soft_topk
+  # - topk_dropout: 持仓 topk 只，每次调仓卖出 n_drop 只表现最差的
+  # - topk: 持仓 topk 只，不主动卖出（n_drop=0）
+  # - soft_topk: 软约束的 Topk 策略
+  type: topk_dropout
+
+  # 持仓数量
+  topk: 30
+
+  # 调仓时卖出数量（仅 topk_dropout 策略有效）
+  n_drop: 3
+
+  # 风险度（0-1之间，越大越保守）
+  risk_degree: 0.95
+
+# 回测日期范围
+# 留空则使用全部可用数据
+date_range:
+  start: null  # YYYY-MM-DD 格式，或 null
+  end: null    # YYYY-MM-DD 格式，或 null
+
+# 交易所配置
+exchange:
+  # 交易所代码: SH (上海), SZ (深圳)
+  code: SH
+
+  # 涨跌停限制
+  limit_threshold: 0.095
+
+  # 是否启用涨跌停惩罚
+  enable_penalty: true
+
+# 输出配置
+output:
+  # 输出目录
+  dir: data/backtest
+
+  # 是否保存报告
+  save_report: true
+
+  # 是否保存持仓
+  save_positions: true
+
+  # 是否生成图表
+  generate_plots: true
+
+# Manager 配置
+manager:
+  config_path: config/online_config.yaml
