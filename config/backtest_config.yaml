@@ -21,8 +21,8 @@ strategy:
 # 回测日期范围
 # 留空则使用全部可用数据
 date_range:
-  start: null  # YYYY-MM-DD 格式，或 null
-  end: null    # YYYY-MM-DD 格式，或 null
+  start: 2025-01-01  # YYYY-MM-DD 格式，或 null
+  end: 2025-12-31    # YYYY-MM-DD 格式，或 null
 
 # 交易所配置
 exchange:

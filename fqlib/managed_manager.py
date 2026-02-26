@@ -113,6 +113,9 @@ class ManagedOnlineManager:
         # Clear existing handlers
         logger.handlers.clear()
 
+        # Prevent duplicate logging
+        logger.propagate = False
+
         # File handler
         log_file = self.log_dir / f"online_manager_{datetime.now():%Y%m%d}.log"
         file_handler = logging.FileHandler(log_file)
@@ -532,12 +535,24 @@ class ManagedOnlineManager:
 
         try:
             signals = self.manager.prepare_signals(prepare_func=prepare_func)
+
+            # Remove duplicate indices (ensemble may create duplicates)
+            if len(signals) > 0 and signals.index.duplicated().any():
+                dup_count = signals.index.duplicated().sum()
+                self.logger.info(f"Removing {dup_count} duplicate indices from signals")
+                signals = signals[~signals.index.duplicated(keep='first')]
+
             self.logger.info(f"Generated {len(signals)} signals")
             self.logger.info(f"Signal date range: {signals.index.get_level_values('datetime').min()} "
                            f"to {signals.index.get_level_values('datetime').max()}")
         except Exception as e:
             self.logger.error(f"Failed to prepare signals: {e}", exc_info=True)
             raise
+
+        # Update manager's signals with deduped version
+        # This ensures the manager stores clean signals without duplicates
+        if hasattr(self.manager, 'signals'):
+            self.manager.signals = signals
 
         # Save checkpoint
         self._save_checkpoint()
@@ -633,39 +648,42 @@ class ManagedOnlineManager:
         self.logger.info(f"Applying ensemble method: {type(ensemble_method).__name__}")
 
         try:
-            # Concatenate all predictions from each strategy
-            strategy_signals = {}
+            # Build ensemble dict with each model as separate entry
+            # qlib ensemble expects: {(strat_name, model_type, model_id): predictions, ...}
+            ensemble_dict = {}
+            model_counter = 0
 
             for strat_name, preds in all_predictions.items():
                 if len(preds) == 0:
                     continue
 
-                # Concatenate all predictions from this strategy
-                # For rolling strategy, we may have multiple predictions for the same (instrument, date)
-                # Keep the last one (most recent)
-                strat_combined = pd.concat(preds)
-                strat_combined = strat_combined[~strat_combined.index.duplicated(keep='last')]
-                strat_combined = strat_combined.sort_index()
+                # For rolling strategy, each model should be ensembled separately
+                for i, pred_series in enumerate(preds):
+                    # Create unique key for each model
+                    # Format: (strategy_name, model_class, model_index)
+                    model_key = (strat_name, 'LGBModel', f'model_{model_counter}')
+                    ensemble_dict[model_key] = pred_series
+                    model_counter += 1
 
-                strategy_signals[strat_name] = strat_combined
-
-                self.logger.info(f"Strategy {strat_name}: {len(strat_combined)} predictions, "
-                               f"dates: {strat_combined.index.min()} to {strat_combined.index.max()}")
+                    self.logger.debug(f"  Model {i} of {strat_name}: {len(pred_series)} records")
 
             # Apply ensemble method
-            if len(strategy_signals) == 0:
+            if len(ensemble_dict) == 0:
                 self.logger.warning("No valid strategy signals to ensemble")
                 return pd.Series()
 
-            # Use the ensemble callable directly
-            if callable(ensemble_method):
-                # The ensemble method expects a list of signals
-                signals_list = list(strategy_signals.values())
-                combined_signals = ensemble_method(signals_list)
-            else:
-                # Fallback: average ensemble
-                all_preds_df = pd.DataFrame(strategy_signals)
-                combined_signals = all_preds_df.mean(axis=1)
+            self.logger.info(f"Ensembling {len(ensemble_dict)} models")
+
+            # Use the ensemble callable
+            # qlib ensemble methods expect a dict, not a list
+            combined_signals = ensemble_method(ensemble_dict)
+
+            # Remove duplicate indices (ensemble may create duplicates)
+            # Keep first occurrence
+            if len(combined_signals) > 0 and combined_signals.index.duplicated().any():
+                dup_count = combined_signals.index.duplicated().sum()
+                self.logger.info(f"Removing {dup_count} duplicate indices from ensemble result")
+                combined_signals = combined_signals[~combined_signals.index.duplicated(keep='first')]
 
             self.logger.info(f"Combined signals: {len(combined_signals)} total records")
 

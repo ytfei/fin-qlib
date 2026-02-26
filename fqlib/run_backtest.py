@@ -131,7 +131,37 @@ def run_backtest(
 
     # 1. 获取信号
     logger.info("步骤 1/5: 获取预测信号")
-    signals = manager.get_signals()
+
+    # 尝试从历史文件加载完整信号（用于回测）
+    signal_file = Path(manager.config['online_manager'].get('signal_export', {})
+                      .get('output_dir', 'data/signals')) / 'signals_history.csv'
+
+    signals = None
+    if signal_file.exists():
+        try:
+            logger.info(f"从历史文件加载信号: {signal_file}")
+            signals_df = pd.read_csv(signal_file)
+
+            # 确保 datetime 列是 Timestamp 类型
+            signals_df['datetime'] = pd.to_datetime(signals_df['datetime'])
+
+            # 转换为 MultiIndex Series（与 manager.get_signals() 格式一致）
+            signals = pd.Series(
+                signals_df.iloc[:, -1].values,  # 最后一列是 score
+                index=pd.MultiIndex.from_frame(
+                    signals_df[['datetime', 'instrument']]
+                )
+            )
+            logger.info(f"从历史文件加载了 {len(signals):,} 条信号")
+        except Exception as e:
+            logger.warning(f"加载历史文件失败: {e}，将使用 manager 的 signals")
+            signals = None
+
+    # 如果历史文件不存在或加载失败，使用 manager 的 signals
+    if signals is None:
+        signals = manager.get_signals()
+        if signals is not None and len(signals) > 0:
+            logger.info(f"使用 manager signals: {len(signals):,} 条")
 
     if signals is None or len(signals) == 0:
         raise ValueError("没有可用的预测信号，请先运行训练和预测")
@@ -175,7 +205,7 @@ def run_backtest(
     logger.info(f"回测信号数量: {len(signals):,}")
 
     # 3. 构建策略
-    logger.info(f"\n步骤 3/5: 构建 {config.strategy_type} 策略")
+    logger.info(f"步骤 3/5: 构建 {config.strategy_type} 策略")
 
     # 转换信号为 DataFrame
     if isinstance(signals, pd.Series):
@@ -219,7 +249,7 @@ def run_backtest(
         logger.info(f"可用策略: topk_dropout, soft_topk, topk")
 
     # 4. 执行回测
-    logger.info("\n步骤 4/5: 执行回测")
+    logger.info("步骤 4/5: 执行回测")
 
     try:
         # 使用 backtest_daily 进行回测
@@ -341,6 +371,14 @@ def _simple_backtest(
         (report, positions) 回测报告和持仓
     """
     logger.warning("使用简化回测方法")
+    logger.warning("=" * 80)
+    logger.warning("简化回测限制:")
+    logger.warning("  1. 使用信号相对强度作为收益代理（非真实交易收益）")
+    logger.warning("  2. 不考虑交易成本、滑点、涨跌停等真实因素")
+    logger.warning("  3. 基准收益为假设值")
+    logger.warning("  4. 结果仅供参考，不能作为真实收益预期")
+    logger.warning("  5. 建议使用专业回测平台（聚宽、米筐等）获取准确数据")
+    logger.warning("=" * 80)
 
     try:
         # 获取信号 - 处理 SignalWCache 对象
@@ -394,14 +432,32 @@ def _simple_backtest(
                 # 选择 topk
                 daily_signal = daily_signal.sort_values(ascending=False)
                 topk_instruments = daily_signal.head(strategy.topk).index.tolist()
+                topk_scores = daily_signal.head(strategy.topk).values
 
-                # 计算当日收益（使用信号值作为 proxy）
+                # 计算当日信号强度（仅作为 proxy，不代表真实收益）
+                # 简化回测注意事项：
+                # 1. 使用信号相对强度作为 proxy
+                # 2. 不考虑交易成本、滑点等真实因素
+                # 3. 结果仅供参考，不能作为真实收益预期
                 if i < len(dates) - 1:
-                    daily_return = daily_signal.head(strategy.topk).mean()
+                    # 计算 TopK 信号相对于当日所有信号的强度
+                    # 使用平均信号值归一化
+                    all_mean = daily_signal.mean()
+                    all_std = daily_signal.std()
+                    topk_mean = topk_scores.mean()
+
+                    # Z-score 标准化后转换为小收益率
+                    if all_std > 0:
+                        z_score = (topk_mean - all_mean) / all_std
+                        # 限制在 ±3 个标准差，转换为 ±1.5% 日收益
+                        daily_return = np.clip(z_score * 0.005, -0.015, 0.015)
+                    else:
+                        daily_return = 0.0
+
                     returns_list.append({
                         'date': date,
                         'return': daily_return,
-                        'bench': 0.0  # 基准收益
+                        'bench': 0.0003  # 假设基准日化收益 0.03%
                     })
 
                 # 记录持仓

@@ -179,12 +179,18 @@ Examples:
             print("Signal Summary")
             print("=" * 80)
 
+            # Remove duplicates if any
+            if signals.index.duplicated().any():
+                dup_count = signals.index.duplicated().sum()
+                print(f"Warning: Found {dup_count} duplicate signals, removing...")
+                signals = signals[~signals.index.duplicated(keep='first')]
+
             if isinstance(signals, pd.DataFrame):
                 latest_date = signals.index.get_level_values('datetime').max()
                 latest_signals = signals.loc[latest_date]
             else:
                 latest_date = signals.index.get_level_values('datetime').max()
-                latest_signals = signals[signals.index.get_level_values('datetime') == latest_date]
+                latest_signals = signals.xs(latest_date, level='datetime')
 
             print(f"Latest signals date: {latest_date}")
             print(f"Number of stocks: {len(latest_signals)}")
