@@ -18,11 +18,14 @@ Endpoints:
 import os
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Depends, status
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from dotenv import load_dotenv
 
 from .prediction_service import PredictionService
 from .api_models import (
@@ -36,8 +39,17 @@ from .api_models import (
     HealthResponse,
 )
 
+# Load environment variables from .env file
+# This will look for .env in the current directory and parent directories
+load_dotenv()
+
 # Global prediction service instance
 prediction_service: Optional[PredictionService] = None
+
+# API Token configuration
+# Set API_TOKEN environment variable to enable authentication
+# If not set or empty, authentication is disabled
+API_TOKEN = os.getenv('API_TOKEN', '')
 
 # Setup logging
 logging.basicConfig(
@@ -45,6 +57,50 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+# Security scheme for Bearer token
+security = HTTPBearer(auto_error=False)
+
+
+async def verify_token(
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+) -> bool:
+    """
+    Verify API token from Authorization header.
+
+    If API_TOKEN is not set or empty, authentication is disabled.
+
+    Args:
+        credentials: HTTP Bearer credentials from Authorization header
+
+    Raises:
+        HTTPException: If token is invalid or missing
+
+    Returns:
+        True if authentication succeeds
+    """
+    # If no token is configured, skip authentication
+    if not API_TOKEN:
+        return True
+
+    if credentials is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated: Missing Authorization header",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    token = credentials.credentials
+
+    if token != API_TOKEN:
+        logger.warning(f"Invalid token attempt: {token[:10]}...")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    return True
 
 
 @asynccontextmanager
@@ -60,6 +116,12 @@ async def lifespan(app: FastAPI):
     logger.info("=" * 80)
     logger.info("STARTING BACKTEST API SERVER")
     logger.info("=" * 80)
+
+    # Log authentication status
+    if API_TOKEN:
+        logger.info("🔒 Authentication ENABLED - API token is configured")
+    else:
+        logger.info("⚠️  Authentication DISABLED - API token not set (not recommended for production)")
 
     config_path = os.getenv('CONFIG_PATH', 'config/online_config.yaml')
     log_dir = os.getenv('LOG_DIR', 'data/logs')
@@ -168,7 +230,8 @@ async def get_predictions(
         None,
         description="Return only top N predictions",
         ge=1
-    )
+    ),
+    authenticated: bool = Depends(verify_token)
 ):
     """
     Get predictions for a specific date.
@@ -181,6 +244,7 @@ async def get_predictions(
         PredictionResponse with stock predictions
 
     Raises:
+        401: Invalid or missing authentication token
         400: Invalid date format
         404: No predictions available for the date
         500: Internal server error
@@ -238,7 +302,8 @@ async def get_batch_predictions(
         None,
         description="Return only top N predictions per date",
         ge=1
-    )
+    ),
+    authenticated: bool = Depends(verify_token)
 ):
     """
     Get predictions for a date range.
@@ -252,6 +317,7 @@ async def get_batch_predictions(
         BatchPredictionResponse with predictions for each date
 
     Raises:
+        401: Invalid or missing authentication token
         400: Invalid date format
         500: Internal server error
     """
@@ -302,12 +368,15 @@ async def get_batch_predictions(
 
 
 @app.get("/dates", tags=["Metadata"])
-async def get_available_dates():
+async def get_available_dates(authenticated: bool = Depends(verify_token)):
     """
     Get list of available prediction dates.
 
     Returns:
         Dict with list of dates in YYYY-MM-DD format
+
+    Raises:
+        401: Invalid or missing authentication token
     """
     if prediction_service is None:
         raise HTTPException(
@@ -327,12 +396,15 @@ async def get_available_dates():
 
 
 @app.get("/status", tags=["Metadata"])
-async def get_status():
+async def get_status(authenticated: bool = Depends(verify_token)):
     """
     Get detailed service status.
 
     Returns:
         Dict with service and manager status information
+
+    Raises:
+        401: Invalid or missing authentication token
     """
     if prediction_service is None:
         return {

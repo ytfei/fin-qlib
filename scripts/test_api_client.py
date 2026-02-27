@@ -40,14 +40,15 @@ def print_subheader(title: str, width: int = 80):
 class APITester:
     """API测试客户端"""
 
-    def __init__(self, base_url: str = "http://localhost:8000"):
+    def __init__(self, base_url: str = "http://localhost:8000", api_token: str = None):
         """
         初始化测试客户端
 
         Args:
             base_url: API服务器地址
+            api_token: API认证token（可选）
         """
-        self.client = StockPredictionClient(base_url)
+        self.client = StockPredictionClient(base_url, api_token=api_token)
 
     def test_health(self) -> bool:
         """测试健康检查"""
@@ -239,6 +240,12 @@ def main():
     )
 
     parser.add_argument(
+        '--api-token',
+        default=None,
+        help='API认证token（可选）'
+    )
+
+    parser.add_argument(
         '--samples',
         type=int,
         default=5,
@@ -267,7 +274,7 @@ def main():
 
     # 使用 context manager 创建测试器
     try:
-        with APITester(base_url=args.url) as tester:
+        with APITester(base_url=args.url, api_token=args.api_token) as tester:
             tester.run_random_tests(sample_count=args.samples, top_n=args.top_n)
 
     except KeyboardInterrupt:

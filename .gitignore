@@ -28,4 +28,6 @@ data/checkpoints/
 .DS_Store
 *.db
 data/
-mlruns/
+mlruns/__pycache__
+*.pyc
+.pytest_cache

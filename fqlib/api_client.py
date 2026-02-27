@@ -64,7 +64,8 @@ class StockPredictionClient:
         self,
         base_url: str = "http://localhost:8000",
         timeout: int = 30,
-        retry_count: int = 3
+        retry_count: int = 3,
+        api_token: Optional[str] = None
     ):
         """
         Initialize the API client.
@@ -73,9 +74,11 @@ class StockPredictionClient:
             base_url: Base URL of the API server (default: http://localhost:8000)
             timeout: Request timeout in seconds (default: 30)
             retry_count: Number of retries for failed requests (default: 3)
+            api_token: Optional API token for authentication (default: None)
         """
         self.base_url = base_url.rstrip('/')
         self.timeout = timeout
+        self.api_token = api_token
 
         # Create session with retry logic
         self.session = requests.Session()
@@ -88,6 +91,12 @@ class StockPredictionClient:
         adapter = HTTPAdapter(max_retries=retry_strategy)
         self.session.mount("http://", adapter)
         self.session.mount("https://", adapter)
+
+        # Set default headers with token if provided
+        if self.api_token:
+            self.session.headers.update({
+                'Authorization': f'Bearer {self.api_token}'
+            })
 
     def _request(
         self,
@@ -424,13 +433,15 @@ def create_client(
 
 
 def quick_check(
-    base_url: str = "http://localhost:8000"
+    base_url: str = "http://localhost:8000",
+    api_token: Optional[str] = None
 ) -> bool:
     """
     Quick health check of the API service.
 
     Args:
         base_url: Base URL of the API server
+        api_token: Optional API token for authentication
 
     Returns:
         True if service is healthy, False otherwise
@@ -438,8 +449,12 @@ def quick_check(
     Example:
         >>> if quick_check():
         ...     print("Service is up!")
+        >>>
+        >>> # With authentication
+        >>> if quick_check(api_token="your-token"):
+        ...     print("Service is up and authenticated!")
     """
-    client = StockPredictionClient(base_url)
+    client = StockPredictionClient(base_url, api_token=api_token)
     try:
         return client.is_healthy()
     finally:
