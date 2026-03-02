@@ -29,8 +29,8 @@ COPY . .
 
 # Install dependencies using uv
 # First install from pyproject.toml for core dependencies
-RUN uv sync --frozen \
-    && uv pip install pyqlib-*.whl \
+RUN uv sync -n --frozen \
+    && uv pip install --no-cache-dir pyqlib-*.whl \
     && rm -fr pyqlib-*.whl \
     && mkdir -p data config qlib_data project_root
 

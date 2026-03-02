@@ -30,9 +30,9 @@ jobs:
 
       - name: Install build dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -e .
-          pip install build wheel
+          python -m pip install --upgrade --no-cache-dir pip
+          pip install --no-cache-dir -e .
+          pip install --no-cache-dir build wheel
 
       - name: Build pyqlib wheel
         run: |
