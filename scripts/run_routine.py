@@ -9,12 +9,13 @@ This script is designed to be run by cron or other schedulers to execute
 daily/weekly/monthly routine updates for the online trading models.
 
 Usage:
-    python run_routine.py --config config/online_config.yaml
-    python run_routine.py --config config/online_config.yaml --cur_time 2024-01-15
+    python run_routine.py
+    python run_routine.py --project /path/to/project
+    python run_routine.py --project /path/to/project --cur_time 2024-01-15
 
 Crontab example:
     # Run at 16:30 every weekday (Monday to Friday)
-    30 16 * * 1-5 cd /path/to/fin-qlib && python scripts/run_routine.py --config config/online_config.yaml >> data/logs/routine.log 2>&1
+    30 16 * * 1-5 cd /path/to/project && python scripts/run_routine.py >> data/logs/routine.log 2>&1
 """
 
 import argparse
@@ -22,11 +23,16 @@ import sys
 import os
 from pathlib import Path
 
-# Add parent directory to path
+# Setup system path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from fqlib.managed_manager import ManagedOnlineManager
 from fqlib.util import init_qlib_from_config
+from fqlib.scripts_helper import (
+    add_project_args,
+    resolve_paths,
+    validate_config,
+)
 
 
 def main():
@@ -35,26 +41,25 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-    # Use default configuration
+    # Use default project (current directory)
     python run_routine.py
 
-    # Specify configuration file
-    python run_routine.py --config config/online_config.yaml
+    # Specify project directory
+    python run_routine.py --project /path/to/project
 
     # Run for specific date
-    python run_routine.py --config config/online_config.yaml --cur_time 2024-01-15
+    python run_routine.py --project /path/to/project --cur_time 2024-01-15
 
     # Sync strategies before running
-    python run_routine.py --config config/online_config.yaml --sync
+    python run_routine.py --project /path/to/project --sync
+
+    # Use custom configuration (overrides project default)
+    python run_routine.py --config config/my_config.yaml
         """
     )
 
-    parser.add_argument(
-        '--config',
-        type=str,
-        default='config/online_config.yaml',
-        help='Path to configuration file (default: config/online_config.yaml)'
-    )
+    # Add standard project arguments
+    parser = add_project_args(parser)
 
     parser.add_argument(
         '--cur-time',
@@ -84,28 +89,37 @@ Examples:
     parser.add_argument(
         '--log-dir',
         type=str,
-        default='data/logs',
-        help='Log directory (default: logs)'
+        default=None,
+        help='Log directory (default: <project>/data/logs)'
     )
 
     args = parser.parse_args()
 
-    # Check if config file exists
-    config_path = Path(args.config)
-    if not config_path.exists():
-        print(f"Error: Configuration file not found: {config_path}")
-        print(f"Please create a configuration file or use --config to specify one.")
+    # Resolve paths
+    paths = resolve_paths(args)
+
+    # Override log_dir if explicitly provided
+    if args.log_dir:
+        log_dir = Path(args.log_dir)
+    else:
+        log_dir = paths['log_dir']
+
+    # Validate config
+    if not validate_config(paths['config_path']):
         sys.exit(1)
 
     # Load configuration
     import yaml
-    with open(config_path, 'r') as f:
+    with open(paths['config_path'], 'r') as f:
         config = yaml.safe_load(f)
 
     # Initialize Qlib
     print("=" * 80)
     print("Initializing Qlib")
     print("=" * 80)
+    print(f"Project: {paths['project_dir']}")
+    print(f"Config: {paths['config_path']}")
+
     init_qlib_from_config(config)
 
     # Create manager
@@ -115,8 +129,9 @@ Examples:
 
     try:
         manager = ManagedOnlineManager(
-            config_path=str(config_path),
-            log_dir=args.log_dir
+            config_path=str(paths['config_path']),
+            log_dir=str(log_dir),
+            project_dir=str(paths['project_dir'])
         )
     except Exception as e:
         print(f"Failed to create manager: {e}")

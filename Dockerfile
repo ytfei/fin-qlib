@@ -32,7 +32,7 @@ COPY . .
 RUN uv sync --frozen \
     && uv pip install pyqlib-*.whl \
     && rm -fr pyqlib-*.whl \
-    && mkdir -p data config qlib_data
+    && mkdir -p data config qlib_data project_root
 
 # Make scripts executable
 RUN chmod +x scripts/*.py 2>/dev/null || true
@@ -40,8 +40,8 @@ RUN chmod +x scripts/*.py 2>/dev/null || true
 # /app/config 是输入配置
 # /app/data 是输出结果
 # /app/qlib_data 是 qlib 行情数据目录
-VOLUME ["/app/config/", "/app/data/", "/app/qlib_data/"]
+VOLUME ["/app/project_root/"]
 
 # Set the default command
 # CMD ["uv", "run", "python", "scripts/run_routine.py", "--config", "config/online_config.yaml"]
-CMD ["uv", "run", "python", "scripts/run_routine.py", "--config", "config/online_config.yaml"]
+CMD ["uv", "run", "python", "scripts/run_routine.py", "--project", "./project_root"]

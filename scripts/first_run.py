@@ -8,8 +8,9 @@ First Run Script - Initialize Online Manager
 This script performs the initial setup and first training run for the online manager.
 
 Usage:
-    python first_run.py --config config/online_config.yaml
-    python first_run.py --config config/online_config.yaml --reset
+    python first_run.py
+    python first_run.py --project /path/to/project
+    python first_run.py --project /path/to/project --reset
 """
 
 import argparse
@@ -18,13 +19,18 @@ import os
 import shutil
 from pathlib import Path
 
-# Add parent directory to path
+# Setup system path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import yaml
 import qlib
 from fqlib.managed_manager import ManagedOnlineManager
 from fqlib.util import init_qlib_from_config
+from fqlib.scripts_helper import (
+    add_project_args,
+    resolve_paths,
+    validate_config,
+)
 
 
 def reset_manager(manager_path: Path):
@@ -54,23 +60,22 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-    # Initialize with default configuration
+    # Initialize with default project (current directory)
     python first_run.py
 
-    # Reset existing data and reinitialize
-    python first_run.py --reset
+    # Initialize with specific project
+    python first_run.py --project /path/to/project
 
-    # Use custom configuration
+    # Reset existing data and reinitialize
+    python first_run.py --project /path/to/project --reset
+
+    # Use custom configuration (overrides project default)
     python first_run.py --config config/my_config.yaml
         """
     )
 
-    parser.add_argument(
-        '--config',
-        type=str,
-        default='config/online_config.yaml',
-        help='Path to configuration file (default: config/online_config.yaml)'
-    )
+    # Add standard project arguments
+    parser = add_project_args(parser)
 
     parser.add_argument(
         '--reset',
@@ -81,27 +86,33 @@ Examples:
     parser.add_argument(
         '--log-dir',
         type=str,
-        default='data/logs',
-        help='Log directory (default: logs)'
+        default=None,
+        help='Log directory (default: <project>/data/logs)'
     )
 
     args = parser.parse_args()
 
-    # Load configuration
-    config_path = Path(args.config)
-    if not config_path.exists():
-        print(f"Error: Configuration file not found: {config_path}")
-        print("\nPlease create a configuration file first:")
-        print("  cp config/online_config_template.yaml config/online_config.yaml")
-        print("  # Then edit config/online_config.yaml with your settings")
+    # Resolve paths
+    paths = resolve_paths(args)
+
+    # Override log_dir if explicitly provided
+    if args.log_dir:
+        log_dir = Path(args.log_dir)
+    else:
+        log_dir = paths['log_dir']
+
+    # Validate config
+    if not validate_config(paths['config_path']):
         sys.exit(1)
 
-    with open(config_path, 'r') as f:
+    # Load configuration
+    with open(paths['config_path'], 'r') as f:
         config = yaml.safe_load(f)
 
     # Check if reset requested
     manager_path_str = config['online_manager'].get('manager_path', 'data/checkpoints/online_manager.pkl')
-    manager_path = Path(manager_path_str)
+    # Resolve manager path relative to project
+    manager_path = paths['project_dir'] / manager_path_str
 
     if args.reset:
         response = input("This will delete all existing models and predictions. Continue? (yes/no): ")
@@ -109,13 +120,14 @@ Examples:
             reset_manager(manager_path)
         else:
             print("Reset cancelled")
-
         sys.exit(0)
 
     # Initialize Qlib
     print("=" * 80)
     print("Initializing Qlib")
     print("=" * 80)
+    print(f"Project: {paths['project_dir']}")
+    print(f"Config: {paths['config_path']}")
 
     init_qlib_from_config(config)
 
@@ -127,8 +139,9 @@ Examples:
 
     try:
         manager = ManagedOnlineManager(
-            config_path=str(config_path),
-            log_dir=args.log_dir
+            config_path=str(paths['config_path']),
+            log_dir=str(log_dir),
+            project_dir=str(paths['project_dir'])
         )
 
         print("\n" + "=" * 80)
@@ -154,9 +167,9 @@ Examples:
         print("=" * 80)
         print("1. Review the trained models and predictions")
         print("2. Set up cron job for daily routine:")
-        print("   30 16 * * 1-5 cd $(pwd) && python scripts/run_routine.py --config config/online_config.yaml >> data/logs/routine.log 2>&1")
+        print(f"   30 16 * * 1-5 cd {paths['project_dir']} && python scripts/run_routine.py --project {paths['project_dir']} >> {log_dir}/routine.log 2>&1")
         print("3. Or run manually:")
-        print("   python scripts/run_routine.py --config config/online_config.yaml")
+        print(f"   python scripts/run_routine.py --project {paths['project_dir']}")
 
     except Exception as e:
         print(f"\nFirst run failed: {e}")

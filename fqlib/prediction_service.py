@@ -38,7 +38,8 @@ class PredictionService:
         self,
         config_path: str = "config/online_config.yaml",
         log_dir: str = "data/logs",
-        signal_file: str = "data/signals/signals_history.csv"
+        signal_file: str = "data/signals/signals_history.csv",
+        project_dir: Optional[str] = None
     ):
         """
         Initialize the prediction service.
@@ -47,10 +48,28 @@ class PredictionService:
             config_path: Path to the configuration file
             log_dir: Directory for log files
             signal_file: Path to the historical signals CSV file
+            project_dir: Project root directory. All relative paths will be
+                         resolved relative to this directory.
         """
         self.config_path = Path(config_path)
+
+        # Determine project directory
+        if project_dir:
+            self.project_dir = Path(project_dir).resolve()
+        else:
+            # If not specified, use config file's parent directory
+            self.project_dir = self.config_path.parent.parent
+
         self.log_dir = Path(log_dir)
+        # Make log_dir relative to project_dir if it's a relative path
+        if not self.log_dir.is_absolute():
+            self.log_dir = self.project_dir / self.log_dir
+
         self.signal_file = Path(signal_file)
+        # Make signal_file relative to project_dir if it's a relative path
+        if not self.signal_file.is_absolute():
+            self.signal_file = self.project_dir / self.signal_file
+
         self.log_dir.mkdir(parents=True, exist_ok=True)
 
         # Setup logging
@@ -132,7 +151,8 @@ class PredictionService:
         try:
             manager = ManagedOnlineManager(
                 config_path=str(self.config_path),
-                log_dir=str(self.log_dir)
+                log_dir=str(self.log_dir),
+                project_dir=str(self.project_dir)
             )
             self.logger.info("ManagedOnlineManager loaded successfully")
             return manager

@@ -7,10 +7,11 @@ Script to start the FastAPI backtest service server.
 
 Usage:
     python scripts/start_api_server.py
+    python scripts/start_api_server.py --project /path/to/project
+    python scripts/start_api_server.py --port 8080
 
 Environment Variables (optional):
-    CONFIG_PATH: Path to configuration file (default: config/online_config.yaml)
-    LOG_DIR: Directory for log files (default: data/logs)
+    API_TOKEN: API authentication token (default: empty/disabled)
     API_HOST: Server host (default: 0.0.0.0)
     API_PORT: Server port (default: 8000)
     API_WORKERS: Number of worker processes (default: 1)
@@ -19,22 +20,85 @@ Environment Variables (optional):
 import os
 import sys
 import logging
+import argparse
+from pathlib import Path
 
 # Add parent directory to path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import uvicorn
+from fqlib.scripts_helper import (
+    add_project_args,
+    resolve_paths,
+    validate_config,
+)
 
 
 def main():
     """Main entry point for starting the API server."""
 
-    # Get configuration from environment
-    config_path = os.getenv('CONFIG_PATH', 'config/online_config.yaml')
-    log_dir = os.getenv('LOG_DIR', 'data/logs')
-    host = os.getenv('API_HOST', '0.0.0.0')
-    port = int(os.getenv('API_PORT', '8000'))
-    workers = int(os.getenv('API_WORKERS', '1'))
+    parser = argparse.ArgumentParser(
+        description="Start the Stock Prediction Backtest API Server",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+    # Start with default settings (current directory)
+    python scripts/start_api_server.py
+
+    # Start with specific project
+    python scripts/start_api_server.py --project /path/to/project
+
+    # Start on custom port
+    python scripts/start_api_server.py --project /path/to/project --port 8080
+        """
+    )
+
+    # Add standard project arguments
+    parser = add_project_args(parser)
+
+    parser.add_argument(
+        '--host',
+        type=str,
+        default=None,
+        help='Server host (default: 0.0.0.0, or API_HOST env var)'
+    )
+
+    parser.add_argument(
+        '--port',
+        type=int,
+        default=None,
+        help='Server port (default: 8000, or API_PORT env var)'
+    )
+
+    parser.add_argument(
+        '--workers',
+        type=int,
+        default=None,
+        help='Number of worker processes (default: 1, or API_WORKERS env var)'
+    )
+
+    parser.add_argument(
+        '--log-dir',
+        type=str,
+        default=None,
+        help='Log directory (default: <project>/data/logs)'
+    )
+
+    args = parser.parse_args()
+
+    # Resolve paths
+    paths = resolve_paths(args)
+
+    # Override log_dir if explicitly provided
+    if args.log_dir:
+        log_dir = Path(args.log_dir)
+    else:
+        log_dir = paths['log_dir']
+
+    # Get configuration from environment or defaults
+    host = args.host or os.getenv('API_HOST', '0.0.0.0')
+    port = args.port or int(os.getenv('API_PORT', '8000'))
+    workers = args.workers or int(os.getenv('API_WORKERS', '1'))
 
     # Setup logging
     logging.basicConfig(
@@ -47,22 +111,36 @@ def main():
     logger.info("=" * 80)
     logger.info("Starting Stock Prediction Backtest API Server")
     logger.info("=" * 80)
+    logger.info(f"Project: {paths['project_dir']}")
     logger.info(f"Configuration:")
-    logger.info(f"  Config path: {config_path}")
+    logger.info(f"  Config path: {paths['config_path']}")
     logger.info(f"  Log directory: {log_dir}")
+    logger.info(f"Server:")
     logger.info(f"  Host: {host}")
     logger.info(f"  Port: {port}")
     logger.info(f"  Workers: {workers}")
+
+    # Check authentication status
+    api_token = os.getenv('API_TOKEN', '')
+    if api_token:
+        logger.info(f"  🔒 Authentication: ENABLED")
+    else:
+        logger.info(f"  ⚠️  Authentication: DISABLED")
+
     logger.info("=" * 80)
 
-    # Check if config file exists
-    if not os.path.exists(config_path):
-        logger.error(f"Configuration file not found: {config_path}")
-        logger.error("Please create a configuration file or set CONFIG_PATH environment variable")
+    # Validate config
+    if not validate_config(paths['config_path']):
         sys.exit(1)
+
+    # Set environment variables for api_server
+    os.environ['CONFIG_PATH'] = str(paths['config_path'])
+    os.environ['LOG_DIR'] = str(log_dir)
+    os.environ['PROJECT_DIR'] = str(paths['project_dir'])
 
     # Start server
     try:
+        logger.info("Starting uvicorn server...")
         uvicorn.run(
             "fqlib.api_server:app",
             host=host,

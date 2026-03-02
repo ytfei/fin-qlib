@@ -125,12 +125,16 @@ async def lifespan(app: FastAPI):
 
     config_path = os.getenv('CONFIG_PATH', 'config/online_config.yaml')
     log_dir = os.getenv('LOG_DIR', 'data/logs')
+    project_dir = os.getenv('PROJECT_DIR')
 
     try:
         logger.info(f"Loading prediction service with config: {config_path}")
+        if project_dir:
+            logger.info(f"Project directory: {project_dir}")
         prediction_service = PredictionService(
             config_path=config_path,
-            log_dir=log_dir
+            log_dir=log_dir,
+            project_dir=project_dir
         )
         logger.info("Prediction service loaded successfully")
     except Exception as e:

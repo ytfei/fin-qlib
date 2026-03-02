@@ -19,6 +19,16 @@ from .ensemble import (
 )
 from .prediction_service import PredictionService
 from .api_client import StockPredictionClient
+from .scripts_helper import (
+    get_project_dir,
+    get_config_path,
+    get_data_dir,
+    get_log_dir,
+    add_project_args,
+    resolve_paths,
+    validate_config,
+    ProjectPaths,
+)
 
 # Define __all__ first
 __all__ = [
@@ -30,6 +40,15 @@ __all__ = [
     "SignalEvaluator",
     "PredictionService",
     "StockPredictionClient",
+    # Scripts helper
+    "get_project_dir",
+    "get_config_path",
+    "get_data_dir",
+    "get_log_dir",
+    "add_project_args",
+    "resolve_paths",
+    "validate_config",
+    "ProjectPaths",
 ]
 
 # API server (optional - requires fastapi)

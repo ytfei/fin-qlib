@@ -61,16 +61,30 @@ class ManagedOnlineManager:
         manager.run_routine()
     """
 
-    def __init__(self, config_path: str, log_dir: str = "data/logs"):
+    def __init__(self, config_path: str, log_dir: str = "data/logs", project_dir: str = None):
         """
         Initialize ManagedOnlineManager from configuration file.
 
         Args:
             config_path: Path to YAML configuration file
             log_dir: Directory for log files
+            project_dir: Project root directory. All relative paths in config
+                         will be resolved relative to this directory.
         """
         self.config_path = Path(config_path)
+
+        # Determine project directory
+        if project_dir:
+            self.project_dir = Path(project_dir).resolve()
+        else:
+            # If not specified, use config file's parent directory
+            self.project_dir = self.config_path.parent.parent
+
         self.log_dir = Path(log_dir)
+        # Make log_dir relative to project_dir if it's a relative path
+        if not self.log_dir.is_absolute():
+            self.log_dir = self.project_dir / self.log_dir
+
         self.log_dir.mkdir(parents=True, exist_ok=True)
 
         # Load configuration
@@ -142,9 +156,13 @@ class ManagedOnlineManager:
         """
         Load existing OnlineManager from checkpoint or create new one.
         """
-        manager_path = self.config['online_manager'].get('manager_path',
+        manager_path_str = self.config['online_manager'].get('manager_path',
                                                           'data/checkpoints/online_manager.pkl')
-        manager_path = Path(manager_path)
+        manager_path = Path(manager_path_str)
+
+        # Make relative to project_dir if not absolute
+        if not manager_path.is_absolute():
+            manager_path = self.project_dir / manager_path
 
         # Ensure checkpoint directory exists
         manager_path.parent.mkdir(parents=True, exist_ok=True)
@@ -588,8 +606,17 @@ class ManagedOnlineManager:
 
     def _save_checkpoint(self):
         """Save manager checkpoint."""
-        manager_path = self.config['online_manager'].get('manager_path',
+        manager_path_str = self.config['online_manager'].get('manager_path',
                                                           'data/checkpoints/online_manager.pkl')
+        manager_path = Path(manager_path_str)
+
+        # Make relative to project_dir if not absolute
+        if not manager_path.is_absolute():
+            manager_path = self.project_dir / manager_path
+
+        # Ensure directory exists
+        manager_path.parent.mkdir(parents=True, exist_ok=True)
+
         self.manager.to_pickle(manager_path)
         self.logger.info(f"Checkpoint saved to {manager_path}")
 
@@ -736,7 +763,13 @@ class ManagedOnlineManager:
             return
 
         # Export directory
-        export_dir = Path(export_config.get('dir', 'data/signals'))
+        export_dir_str = export_config.get('dir', 'data/signals')
+        export_dir = Path(export_dir_str)
+
+        # Make relative to project_dir if not absolute
+        if not export_dir.is_absolute():
+            export_dir = self.project_dir / export_dir
+
         export_dir.mkdir(parents=True, exist_ok=True)
 
         # Export format
